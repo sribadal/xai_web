@@ -1,0 +1,180 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Survey {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  status      SurveyStatus @default(DRAFT)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  publishedAt DateTime?    @map("published_at")
+
+  questions Question[]
+  sessions  SurveySession[]
+
+  @@map("surveys")
+}
+
+model Question {
+  id           String       @id @default(uuid())
+  surveyId     String       @map("survey_id")
+  type         QuestionType
+  text         String
+  description  String?
+  helperText   String?      @map("helper_text")
+  isRequired   Boolean      @default(true) @map("is_required")
+  displayOrder Int          @map("display_order")
+
+  survey    Survey        @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers   Answer[]
+  responses Response[]
+  tags      QuestionTag[]
+
+  @@unique([surveyId, displayOrder])
+  @@map("questions")
+}
+
+model Answer {
+  id           String @id @default(uuid())
+  questionId   String @map("question_id")
+  label        String
+  value        Int
+  displayOrder Int    @map("display_order")
+
+  question        Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  responseAnswers ResponseAnswer[]
+
+  @@unique([questionId, displayOrder])
+  @@map("answers")
+}
+
+model GlossaryTerm {
+  id         String   @id @default(uuid())
+  term       String   @unique
+  definition String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("glossary_terms")
+}
+
+model TagGroup {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+
+  tags Tag[]
+
+  @@map("tag_groups")
+}
+
+model Tag {
+  id      String @id @default(uuid())
+  groupId String @map("group_id")
+  name    String
+
+  group        TagGroup      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  questionTags QuestionTag[]
+
+  @@unique([groupId, name])
+  @@map("tags")
+}
+
+model QuestionTag {
+  id         String @id @default(uuid())
+  questionId String @map("question_id")
+  tagId      String @map("tag_id")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, tagId])
+  @@map("question_tags")
+}
+
+model Participant {
+  id         String   @id @default(uuid())
+  accessCode String   @unique @map("access_code")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  sessions SurveySession[]
+
+  @@map("participants")
+}
+
+model SurveySession {
+  id            String        @id @default(uuid())
+  surveyId      String        @map("survey_id")
+  participantId String        @map("participant_id")
+  status        SessionStatus @default(IN_PROGRESS)
+  startedAt     DateTime      @default(now()) @map("started_at")
+  completedAt   DateTime?     @map("completed_at")
+
+  survey      Survey      @relation(fields: [surveyId], references: [id])
+  participant Participant @relation(fields: [participantId], references: [id])
+  responses   Response[]
+
+  @@unique([surveyId, participantId])
+  @@map("survey_sessions")
+}
+
+model Response {
+  id           String   @id @default(uuid())
+  sessionId    String   @map("session_id")
+  questionId   String   @map("question_id")
+  openText     String?  @map("open_text")
+  rankingOrder Json?    @map("ranking_order")
+  timeSpentMs  Int?     @map("time_spent_ms")
+  answeredAt   DateTime @default(now()) @map("answered_at")
+
+  session         SurveySession    @relation(fields: [sessionId], references: [id])
+  question        Question         @relation(fields: [questionId], references: [id])
+  selectedAnswers ResponseAnswer[]
+
+  @@unique([sessionId, questionId])
+  @@map("responses")
+}
+
+model ResponseAnswer {
+  id         String @id @default(uuid())
+  responseId String @map("response_id")
+  answerId   String @map("answer_id")
+
+  response Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  answer   Answer   @relation(fields: [answerId], references: [id])
+
+  @@unique([responseId, answerId])
+  @@map("response_answers")
+}
+
+enum QuestionType {
+  LIKERT
+  RADIO
+  CHECKBOX
+  OPEN
+  RANKING
+}
+
+enum SurveyStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
