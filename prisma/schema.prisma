@@ -12,62 +12,127 @@ datasource db {
   provider = "postgresql"
 }
 
+model Locale {
+  id   String @id           // "en", "nl", "de"
+  name String               // "English", "Nederlands", "Deutsch"
+
+  surveyTranslations       SurveyTranslation[]
+  questionTranslations     QuestionTranslation[]
+  answerTranslations       AnswerTranslation[]
+  glossaryTermTranslations GlossaryTermTranslation[]
+
+  @@map("locales")
+}
+
 model Survey {
   id          String       @id @default(uuid())
-  title       String
-  description String?
   status      SurveyStatus @default(DRAFT)
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
   publishedAt DateTime?    @map("published_at")
 
-  questions Question[]
-  sessions  SurveySession[]
+  translations SurveyTranslation[]
+  questions    Question[]
+  sessions     SurveySession[]
 
   @@map("surveys")
+}
+
+model SurveyTranslation {
+  id          String @id @default(uuid())
+  surveyId    String @map("survey_id")
+  localeId    String @map("locale_id")
+  title       String
+  description String?
+
+  survey Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  locale Locale @relation(fields: [localeId], references: [id])
+
+  @@unique([surveyId, localeId])
+  @@map("survey_translations")
 }
 
 model Question {
   id           String       @id @default(uuid())
   surveyId     String       @map("survey_id")
   type         QuestionType
-  text         String
-  description  String?
-  helperText   String?      @map("helper_text")
   isRequired   Boolean      @default(true) @map("is_required")
   displayOrder Int          @map("display_order")
 
-  survey    Survey        @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  answers   Answer[]
-  responses Response[]
-  tags      QuestionTag[]
+  survey       Survey                @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  translations QuestionTranslation[]
+  answers      Answer[]
+  responses    Response[]
+  tags         QuestionTag[]
 
   @@unique([surveyId, displayOrder])
   @@map("questions")
 }
 
+model QuestionTranslation {
+  id          String  @id @default(uuid())
+  questionId  String  @map("question_id")
+  localeId    String  @map("locale_id")
+  text        String
+  description String?
+  helperText  String? @map("helper_text")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  locale   Locale   @relation(fields: [localeId], references: [id])
+
+  @@unique([questionId, localeId])
+  @@map("question_translations")
+}
+
 model Answer {
   id           String @id @default(uuid())
   questionId   String @map("question_id")
-  label        String
   value        Int
   displayOrder Int    @map("display_order")
 
-  question        Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question        Question            @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  translations    AnswerTranslation[]
   responseAnswers ResponseAnswer[]
 
   @@unique([questionId, displayOrder])
   @@map("answers")
 }
 
+model AnswerTranslation {
+  id       String @id @default(uuid())
+  answerId String @map("answer_id")
+  localeId String @map("locale_id")
+  label    String
+
+  answer Answer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  locale Locale @relation(fields: [localeId], references: [id])
+
+  @@unique([answerId, localeId])
+  @@map("answer_translations")
+}
+
 model GlossaryTerm {
-  id         String   @id @default(uuid())
-  term       String   @unique
-  definition String
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  term      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  translations GlossaryTermTranslation[]
 
   @@map("glossary_terms")
+}
+
+model GlossaryTermTranslation {
+  id             String @id @default(uuid())
+  glossaryTermId String @map("glossary_term_id")
+  localeId       String @map("locale_id")
+  definition     String
+
+  glossaryTerm GlossaryTerm @relation(fields: [glossaryTermId], references: [id], onDelete: Cascade)
+  locale       Locale       @relation(fields: [localeId], references: [id])
+
+  @@unique([glossaryTermId, localeId])
+  @@map("glossary_term_translations")
 }
 
 model TagGroup {
@@ -135,7 +200,7 @@ model Response {
   sessionId    String   @map("session_id")
   questionId   String   @map("question_id")
   openText     String?  @map("open_text")
-  rankingOrder Json?    @map("ranking_order")
+  rankingOrder String?  @map("ranking_order") // comma-separated answer ids
   timeSpentMs  Int?     @map("time_spent_ms")
   answeredAt   DateTime @default(now()) @map("answered_at")
 
