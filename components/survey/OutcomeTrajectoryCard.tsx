@@ -185,7 +185,7 @@ function RsfMortalityTrajectory({
               labelFormatter={(d) =>
                 `Day ${d} (~${(Number(d) / DAYS_PER_MONTH).toFixed(1)} mo)`
               }
-              formatter={(v: number) => [`${v.toFixed(1)}%`, "Mortality"]}
+              formatter={(v) => [Number(v).toFixed(1), "Mortality"]}
               contentStyle={{ fontSize: 11 }}
             />
           </AreaChart>
@@ -292,7 +292,7 @@ function CondorQolTrajectory({
               labelFormatter={(m) =>
                 m === 0 ? "Baseline" : `${m} month${m === 1 ? "" : "s"}`
               }
-              formatter={(v: number) => [v.toFixed(1), "QoL"]}
+              formatter={(v) => [Number(v).toFixed(1), "QoL"]}
               contentStyle={{ fontSize: 11 }}
             />
           </LineChart>
