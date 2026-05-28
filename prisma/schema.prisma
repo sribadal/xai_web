@@ -12,13 +12,9 @@ datasource db {
   provider = "postgresql"
 }
 
-// =====================================================================
-// i18n
-// =====================================================================
-
 model Locale {
-  id   String @id           // "en", "nl", "de"
-  name String               // "English", "Nederlands", "Deutsch"
+  id   String @id
+  name String
 
   surveyTranslations       SurveyTranslation[]
   questionTranslations     QuestionTranslation[]
@@ -28,17 +24,14 @@ model Locale {
   @@map("locales")
 }
 
-// =====================================================================
-// Explanation dataset (read-only, seeded from Python export)
-// =====================================================================
-
 model Patient {
   id         String   @id @default(uuid())
-  externalId String   @map("external_id")    // patient_id from the export JSON (0..N)
-  modelType  String   @map("model_type")     // "rsf" | "condor"
-  features   Json                             // raw feature row
-  prediction Json                             // {risk_score, survival_curve?}
-  notes      String?                          // admin/supervisor notes (vignette candidacy, quality flags, etc.)
+  externalId String   @map("external_id")
+  modelType  String   @map("model_type")
+  features   Json
+  featuresRaw Json?   @map("features_raw")
+  prediction Json
+  notes      String?
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -51,24 +44,23 @@ model Patient {
 }
 
 model Explanation {
-  id        String @id @default(uuid())
-  patientId String @map("patient_id")
-  modality  Modality
-  method    String                              // "lime" | "dice" | "knn" | "rulefit" | ...
-  content   Json
-  metadata  Json
-  error     String?                             // null = success; non-null = failure, contents of content/metadata may be stubs
+  id          String   @id @default(uuid())
+  patientId   String   @map("patient_id")
+  modality    Modality
+  method      String
+  timeHorizon String   @default("") @map("time_horizon")
+  content     Json
+  metadata    Json
+  error       String?
+  errorType   String?  @map("error_type")
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  @@unique([patientId, modality, method])
+  @@unique([patientId, modality, method, timeHorizon])
   @@index([modality, method])
+  @@index([timeHorizon])
   @@map("explanations")
 }
-
-// =====================================================================
-// Survey instrument
-// =====================================================================
 
 model Survey {
   id          String       @id @default(uuid())
@@ -77,23 +69,30 @@ model Survey {
   updatedAt   DateTime     @updatedAt @map("updated_at")
   publishedAt DateTime?    @map("published_at")
 
-  // Which dataset to draw vignettes from
-  modelType          String @default("rsf") @map("model_type")
-  patientsPerSession Int    @default(5)     @map("patients_per_session")
-
-  // Which method represents each modality in this survey.
-  // Stored as plain strings so they can be swapped during piloting
-  // without a migration.
-  attributionMethod    String @map("attribution_method")     // e.g. "lime"
-  counterfactualMethod String @map("counterfactual_method")  // e.g. "dice"
-  caseBasedMethod      String @map("case_based_method")      // e.g. "knn"
-  ruleBasedMethod      String @map("rule_based_method")      // e.g. "rulefit"
+  rsfVignettePatientIds    String[] @default([]) @map("rsf_vignette_patient_ids")
+  condorVignettePatientIds String[] @default([]) @map("condor_vignette_patient_ids")
 
   translations SurveyTranslation[]
   questions    Question[]
   sessions     SurveySession[]
+  methods      SurveyMethod[]
+  participants Participant[]
 
   @@map("surveys")
+}
+
+model SurveyMethod {
+  id        String   @id @default(uuid())
+  surveyId  String   @map("survey_id")
+  modelType String   @map("model_type")
+  modality  Modality
+  method    String
+
+  survey Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, modelType, modality])
+  @@index([surveyId])
+  @@map("survey_methods")
 }
 
 model SurveyTranslation {
@@ -118,8 +117,6 @@ model Question {
   displayOrder Int          @map("display_order")
   active       Boolean      @default(true)
 
-  // Optional: scope a question to a specific modality.
-  // null = session-level question (e.g. "overall, which did you prefer?")
   modality Modality?
 
   survey       Survey                @relation(fields: [surveyId], references: [id], onDelete: Cascade)
@@ -174,10 +171,6 @@ model AnswerTranslation {
   @@map("answer_translations")
 }
 
-// =====================================================================
-// Glossary
-// =====================================================================
-
 model GlossaryTerm {
   id        String   @id @default(uuid())
   term      String   @unique
@@ -193,6 +186,7 @@ model GlossaryTermTranslation {
   id             String @id @default(uuid())
   glossaryTermId String @map("glossary_term_id")
   localeId       String @map("locale_id")
+  label          String
   definition     String
 
   glossaryTerm GlossaryTerm @relation(fields: [glossaryTermId], references: [id], onDelete: Cascade)
@@ -201,10 +195,6 @@ model GlossaryTermTranslation {
   @@unique([glossaryTermId, localeId])
   @@map("glossary_term_translations")
 }
-
-// =====================================================================
-// Tags
-// =====================================================================
 
 model TagGroup {
   id          String  @id @default(uuid())
@@ -241,17 +231,16 @@ model QuestionTag {
   @@map("question_tags")
 }
 
-// =====================================================================
-// Participants & sessions
-// =====================================================================
-
 model Participant {
   id         String   @id @default(uuid())
   accessCode String   @unique @map("access_code")
+  surveyId   String   @map("survey_id")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  survey   Survey          @relation(fields: [surveyId], references: [id], onDelete: Restrict)
   sessions SurveySession[]
 
+  @@index([surveyId])
   @@map("participants")
 }
 
@@ -263,8 +252,8 @@ model SurveySession {
   startedAt     DateTime      @default(now()) @map("started_at")
   completedAt   DateTime?     @map("completed_at")
 
-  // Randomized at session creation so the participant always sees their
-  // modality blocks in the same order on refresh.
+  currentStepKey String @default("intro") @map("current_step_key")
+
   modalityOrder Modality[] @map("modality_order")
 
   survey          Survey           @relation(fields: [surveyId], references: [id])
@@ -276,38 +265,32 @@ model SurveySession {
   @@map("survey_sessions")
 }
 
-// Join: which patients (vignettes) does this session show, and in what order.
-// Same N patients are reused across all four modality blocks within the session.
 model SessionPatient {
-  id           String @id @default(uuid())
-  sessionId    String @map("session_id")
-  patientId    String @map("patient_id")
-  displayOrder Int    @map("display_order")  // 0..patientsPerSession-1
+  id           String   @id @default(uuid())
+  sessionId    String   @map("session_id")
+  patientId    String   @map("patient_id")
+  modality     Modality
+  modelType    String   @map("model_type")
+  displayOrder Int      @map("display_order")
 
   session SurveySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   patient Patient       @relation(fields: [patientId], references: [id])
 
-  @@unique([sessionId, patientId])
+  @@unique([sessionId, modality, modelType])
   @@unique([sessionId, displayOrder])
   @@map("session_patients")
 }
-
-// =====================================================================
-// Responses
-// =====================================================================
 
 model Response {
   id           String   @id @default(uuid())
   sessionId    String   @map("session_id")
   questionId   String   @map("question_id")
 
-  // For per-vignette questions: which patient and which modality this
-  // answer refers to. Both null for session-level questions.
   patientId    String?   @map("patient_id")
   modality     Modality?
 
   openText     String?   @map("open_text")
-  rankingOrder String[]  @map("ranking_order")   // ordered answer ids (for RANKING questions)
+  rankingOrder String[]  @map("ranking_order")
   timeSpentMs  Int?      @map("time_spent_ms")
   answeredAt   DateTime  @default(now()) @map("answered_at")
 
@@ -334,10 +317,6 @@ model ResponseAnswer {
   @@index([answerId])
   @@map("response_answers")
 }
-
-// =====================================================================
-// Enums
-// =====================================================================
 
 enum QuestionType {
   LIKERT
