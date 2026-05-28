@@ -13,8 +13,8 @@ datasource db {
 }
 
 model Locale {
-  id   String @id           // "en", "nl", "de"
-  name String               // "English", "Nederlands", "Deutsch"
+  id   String @id
+  name String
 
   surveyTranslations       SurveyTranslation[]
   questionTranslations     QuestionTranslation[]
@@ -24,6 +24,44 @@ model Locale {
   @@map("locales")
 }
 
+model Patient {
+  id         String   @id @default(uuid())
+  externalId String   @map("external_id")
+  modelType  String   @map("model_type")
+  features   Json
+  featuresRaw Json?   @map("features_raw")
+  prediction Json
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  explanations    Explanation[]
+  sessionPatients SessionPatient[]
+  responses       Response[]
+
+  @@unique([modelType, externalId])
+  @@map("patients")
+}
+
+model Explanation {
+  id          String   @id @default(uuid())
+  patientId   String   @map("patient_id")
+  modality    Modality
+  method      String
+  timeHorizon String   @default("") @map("time_horizon")
+  content     Json
+  metadata    Json
+  error       String?
+  errorType   String?  @map("error_type")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, modality, method, timeHorizon])
+  @@index([modality, method])
+  @@index([timeHorizon])
+  @@map("explanations")
+}
+
 model Survey {
   id          String       @id @default(uuid())
   status      SurveyStatus @default(DRAFT)
@@ -31,17 +69,36 @@ model Survey {
   updatedAt   DateTime     @updatedAt @map("updated_at")
   publishedAt DateTime?    @map("published_at")
 
+  rsfVignettePatientIds    String[] @default([]) @map("rsf_vignette_patient_ids")
+  condorVignettePatientIds String[] @default([]) @map("condor_vignette_patient_ids")
+
   translations SurveyTranslation[]
   questions    Question[]
   sessions     SurveySession[]
+  methods      SurveyMethod[]
+  participants Participant[]
 
   @@map("surveys")
 }
 
+model SurveyMethod {
+  id        String   @id @default(uuid())
+  surveyId  String   @map("survey_id")
+  modelType String   @map("model_type")
+  modality  Modality
+  method    String
+
+  survey Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, modelType, modality])
+  @@index([surveyId])
+  @@map("survey_methods")
+}
+
 model SurveyTranslation {
-  id          String @id @default(uuid())
-  surveyId    String @map("survey_id")
-  localeId    String @map("locale_id")
+  id          String  @id @default(uuid())
+  surveyId    String  @map("survey_id")
+  localeId    String  @map("locale_id")
   title       String
   description String?
 
@@ -58,6 +115,9 @@ model Question {
   type         QuestionType
   isRequired   Boolean      @default(true) @map("is_required")
   displayOrder Int          @map("display_order")
+  active       Boolean      @default(true)
+
+  modality Modality?
 
   survey       Survey                @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   translations QuestionTranslation[]
@@ -65,7 +125,7 @@ model Question {
   responses    Response[]
   tags         QuestionTag[]
 
-  @@unique([surveyId, displayOrder])
+  @@index([surveyId])
   @@map("questions")
 }
 
@@ -126,6 +186,7 @@ model GlossaryTermTranslation {
   id             String @id @default(uuid())
   glossaryTermId String @map("glossary_term_id")
   localeId       String @map("locale_id")
+  label          String
   definition     String
 
   glossaryTerm GlossaryTerm @relation(fields: [glossaryTermId], references: [id], onDelete: Cascade)
@@ -166,16 +227,20 @@ model QuestionTag {
   tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([questionId, tagId])
+  @@index([tagId])
   @@map("question_tags")
 }
 
 model Participant {
   id         String   @id @default(uuid())
   accessCode String   @unique @map("access_code")
+  surveyId   String   @map("survey_id")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  survey   Survey          @relation(fields: [surveyId], references: [id], onDelete: Restrict)
   sessions SurveySession[]
 
+  @@index([surveyId])
   @@map("participants")
 }
 
@@ -187,28 +252,56 @@ model SurveySession {
   startedAt     DateTime      @default(now()) @map("started_at")
   completedAt   DateTime?     @map("completed_at")
 
-  survey      Survey      @relation(fields: [surveyId], references: [id])
-  participant Participant @relation(fields: [participantId], references: [id])
-  responses   Response[]
+  currentStepKey String @default("intro") @map("current_step_key")
+
+  modalityOrder Modality[] @map("modality_order")
+
+  survey          Survey           @relation(fields: [surveyId], references: [id])
+  participant     Participant      @relation(fields: [participantId], references: [id])
+  responses       Response[]
+  sessionPatients SessionPatient[]
 
   @@unique([surveyId, participantId])
   @@map("survey_sessions")
+}
+
+model SessionPatient {
+  id           String   @id @default(uuid())
+  sessionId    String   @map("session_id")
+  patientId    String   @map("patient_id")
+  modality     Modality
+  modelType    String   @map("model_type")
+  displayOrder Int      @map("display_order")
+
+  session SurveySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  patient Patient       @relation(fields: [patientId], references: [id])
+
+  @@unique([sessionId, modality, modelType])
+  @@unique([sessionId, displayOrder])
+  @@map("session_patients")
 }
 
 model Response {
   id           String   @id @default(uuid())
   sessionId    String   @map("session_id")
   questionId   String   @map("question_id")
-  openText     String?  @map("open_text")
-  rankingOrder String?  @map("ranking_order") // comma-separated answer ids
-  timeSpentMs  Int?     @map("time_spent_ms")
-  answeredAt   DateTime @default(now()) @map("answered_at")
+
+  patientId    String?   @map("patient_id")
+  modality     Modality?
+
+  openText     String?   @map("open_text")
+  rankingOrder String[]  @map("ranking_order")
+  timeSpentMs  Int?      @map("time_spent_ms")
+  answeredAt   DateTime  @default(now()) @map("answered_at")
 
   session         SurveySession    @relation(fields: [sessionId], references: [id])
   question        Question         @relation(fields: [questionId], references: [id])
+  patient         Patient?         @relation(fields: [patientId], references: [id])
   selectedAnswers ResponseAnswer[]
 
-  @@unique([sessionId, questionId])
+  @@unique([sessionId, questionId, patientId, modality])
+  @@index([questionId])
+  @@index([patientId])
   @@map("responses")
 }
 
@@ -221,6 +314,7 @@ model ResponseAnswer {
   answer   Answer   @relation(fields: [answerId], references: [id])
 
   @@unique([responseId, answerId])
+  @@index([answerId])
   @@map("response_answers")
 }
 
@@ -242,4 +336,11 @@ enum SessionStatus {
   IN_PROGRESS
   COMPLETED
   ABANDONED
+}
+
+enum Modality {
+  ATTRIBUTION
+  COUNTERFACTUAL
+  CASE_BASED
+  RULE_BASED
 }

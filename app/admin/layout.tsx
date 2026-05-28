@@ -1,7 +1,16 @@
-// app/admin/layout.tsx
+import Link from "next/link"
 import { auth, signIn, signOut } from "@/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+
+const navItems = [
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/surveys", label: "Surveys" },
+  { href: "/admin/glossary", label: "Glossary" },
+  { href: "/admin/taxonomy", label: "Taxonomy" },
+  { href: "/admin/participants", label: "Participants" },
+  { href: "/admin/patients", label: "Patients" }, 
+]
 
 export default async function AdminLayout({
   children,
@@ -40,20 +49,38 @@ export default async function AdminLayout({
   }
 
   return (
-    <div>
-      <nav className="flex items-center justify-between p-4 border-b">
-        <span className="font-medium">Admin</span>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-muted-foreground">{session.user?.name}</span>
+    <div className="flex min-h-svh">
+      {/* Sidebar */}
+      <aside className="w-56 border-r bg-muted/30 p-4 flex flex-col justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium px-3 py-2 text-muted-foreground">XAI Survey</p>
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="block px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground px-3 truncate">{session.user?.email}</p>
           <form action={async () => {
             "use server"
             await signOut()
           }}>
-            <Button variant="ghost" size="sm">Sign out</Button>
+            <Button variant="ghost" size="sm" className="w-full justify-start px-3">
+              Sign out
+            </Button>
           </form>
         </div>
-      </nav>
-      <main className="p-6">{children}</main>
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 p-8 max-w-5xl">
+        {children}
+      </main>
     </div>
   )
 }
