@@ -10,7 +10,7 @@ export default async function Page({
 }) {
   const { code } = await params;
   await redirectIfCompleted(code);
-  
+
   const loaded = await getSessionByCode(code);
   if (!loaded) notFound();
 
@@ -25,7 +25,14 @@ export default async function Page({
     >
       <ul>
         <li>This is a prototype tool used for research purposes only.</li>
-        <li>Your responses will be used anonymously to evaluate explanation designs.</li>
+        <li>
+          Your responses will be used anonymously to evaluate explanation
+          designs.
+        </li>
+        <li>
+          With your permission, we will record your screen and microphone during
+          the session. No face camera will be used.
+        </li>
         <li>Participation is voluntary; you may stop at any time.</li>
       </ul>
     </StaticStep>
