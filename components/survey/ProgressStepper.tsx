@@ -48,12 +48,11 @@ function codeFromPathname(pathname: string): string | null {
 function pathnameToSubStep(
   pathname: string,
   code: string,
-): "patient-0" | "patient-1" | "summary" | null {
+): "patient-0" | "patient-1" | null {
   const prefix = `/survey/${code}/modality/`;
   if (!pathname.startsWith(prefix)) return null;
   const tail = pathname.slice(prefix.length).split("/").filter(Boolean);
   // tail = [modalityIdx, "patient", patientIdx] or [modalityIdx, "summary"]
-  if (tail[1] === "summary") return "summary";
   if (tail[1] === "patient") {
     if (tail[2] === "0") return "patient-0";
     if (tail[2] === "1") return "patient-1";
@@ -75,8 +74,6 @@ function targetStepToPath(
       return `${base}/practice`;
     case "patient":
       return `${base}/modality/${step.modalityIndex}/patient/${step.patientIndex}`;
-    case "summary":
-      return `${base}/modality/${step.modalityIndex}/summary`;
     case "final":
       return `${base}/final`;
     default:
@@ -88,8 +85,6 @@ function stepKeyToSerialized(step: SectionProgress["targetStep"]): string {
   switch (step.kind) {
     case "patient":
       return `patient:${step.modalityIndex}:${step.patientIndex}`;
-    case "summary":
-      return `summary:${step.modalityIndex}`;
     default:
       return step.kind;
   }

@@ -28,7 +28,7 @@ export type SectionStatus =
 export type SectionCompletionStatus = "done" | "incomplete" | "pending";
 
 export type SubStepProgress = {
-  key: "patient-0" | "patient-1" | "summary";
+  key: "patient-0" | "patient-1";
   label: string;
   targetStep: StepKey;
   completionStatus: SectionCompletionStatus;
@@ -65,7 +65,6 @@ function sectionForStep(step: StepKey): SectionKey | null {
     case "practice":
       return "practice";
     case "patient":
-    case "summary":
       return `modality-${step.modalityIndex}` as SectionKey;
     case "final":
       return "final";
@@ -111,7 +110,6 @@ function stepsOfSection(key: SectionKey): StepKey[] {
       return [
         { kind: "patient", modalityIndex: m, patientIndex: 0 },
         { kind: "patient", modalityIndex: m, patientIndex: 1 },
-        { kind: "summary", modalityIndex: m },
       ];
     }
     case "final":
@@ -223,9 +221,6 @@ function sectionRequiredMissing(
       const perVignette = qs.filter(
         (q) => flowTagFor(q) === "per-vignette",
       );
-      const modalitySummary = qs.filter(
-        (q) => flowTagFor(q) === "modality-summary",
-      );
 
       const patientsInBlock = session.sessionPatients.filter(
         (sp) => sp.modality === modality,
@@ -243,15 +238,6 @@ function sectionRequiredMissing(
         }
       }
 
-      for (const q of modalitySummary) {
-        const r = session.responses.find(
-          (r) =>
-            r.questionId === q.id &&
-            r.patientId === null &&
-            r.modality === modality,
-        );
-        if (!r || !responseHasContent(r)) return true;
-      }
       return false;
     }
   }
@@ -323,21 +309,12 @@ function modalitySubStepCompletion(
         label: "Patient 2",
         targetStep: { kind: "patient", modalityIndex: modalityIdx, patientIndex: 1 },
         completionStatus: "pending",
-      },
-      {
-        key: "summary",
-        label: "Reflection",
-        targetStep: { kind: "summary", modalityIndex: modalityIdx },
-        completionStatus: "pending",
-      },
+      }
     ];
   }
 
   const requiredPerVignette = session.survey.questions.filter(
     (q) => q.active && q.isRequired && flowTagFor(q) === "per-vignette",
-  );
-  const requiredSummary = session.survey.questions.filter(
-    (q) => q.active && q.isRequired && flowTagFor(q) === "modality-summary",
   );
   const rsfPatient = session.sessionPatients.find(
     (sp) => sp.modality === modality && sp.modelType === "rsf",
@@ -386,35 +363,6 @@ function modalitySubStepCompletion(
     return "pending";
   }
 
-  function summaryStatus(): SectionCompletionStatus {
-    const hasAny = session.responses.some(
-      (r) =>
-        r.modality === modality &&
-        r.patientId === null &&
-        responseHasContent(r),
-    );
-    let missing = false;
-    for (const q of requiredSummary) {
-      const r = session.responses.find(
-        (r) =>
-          r.questionId === q.id &&
-          r.patientId === null &&
-          r.modality === modality,
-      );
-      if (!r || !responseHasContent(r)) {
-        missing = true;
-        break;
-      }
-    }
-    const passed =
-      stepIndex(currentStep) >=
-      stepIndex({ kind: "summary", modalityIndex: modalityIdx });
-
-    if (!missing && (hasAny || passed)) return "done";
-    if (hasAny || passed) return "incomplete";
-    return "pending";
-  }
-
   return [
     {
       key: "patient-0",
@@ -435,13 +383,7 @@ function modalitySubStepCompletion(
         patientIndex: 1,
       },
       completionStatus: patientStatus(condorPatient?.patientId, 1),
-    },
-    {
-      key: "summary",
-      label: "Reflection",
-      targetStep: { kind: "summary", modalityIndex: modalityIdx },
-      completionStatus: summaryStatus(),
-    },
+    }
   ];
 }
 
@@ -472,9 +414,6 @@ function subProgressFor(
       total: 3,
       label: `Patient ${currentStep.patientIndex + 1} of 2`,
     };
-  }
-  if (currentStep.kind === "summary") {
-    return { current: 3, total: 3, label: "Reflection" };
   }
   return null;
 }

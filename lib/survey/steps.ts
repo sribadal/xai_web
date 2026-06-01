@@ -7,7 +7,6 @@ export type StepKey =
   | { kind: "background" }
   | { kind: "practice" }
   | { kind: "patient"; modalityIndex: ModalityIndex; patientIndex: PatientIndex }
-  | { kind: "summary"; modalityIndex: ModalityIndex }
   | { kind: "final" }
   | { kind: "complete" };
 
@@ -21,7 +20,6 @@ export const STEP_SEQUENCE: StepKey[] = [
   ...MODALITY_INDICES.flatMap<StepKey>((m) => [
     { kind: "patient", modalityIndex: m, patientIndex: 0 },
     { kind: "patient", modalityIndex: m, patientIndex: 1 },
-    { kind: "summary", modalityIndex: m },
   ]),
   { kind: "final" },
   { kind: "complete" },
@@ -35,8 +33,6 @@ export function serializeStep(step: StepKey): string {
   switch (step.kind) {
     case "patient":
       return `patient:${step.modalityIndex}:${step.patientIndex}`;
-    case "summary":
-      return `summary:${step.modalityIndex}`;
     default:
       return step.kind;
   }
@@ -59,11 +55,6 @@ export function deserializeStep(key: string): StepKey {
       }
       return { kind: "intro" };
     }
-    case "summary": {
-      const m = Number(a);
-      if (isModalityIndex(m)) return { kind: "summary", modalityIndex: m };
-      return { kind: "intro" };
-    }
     default:
       return { kind: "intro" };
   }
@@ -77,7 +68,6 @@ export function stepToPath(code: string, step: StepKey): string {
     case "background": return `${base}/background`;
     case "practice": return `${base}/practice`;
     case "patient": return `${base}/modality/${step.modalityIndex}/patient/${step.patientIndex}`;
-    case "summary": return `${base}/modality/${step.modalityIndex}/summary`;
     case "final": return `${base}/final`;
     case "complete": return `${base}/complete`;
   }
@@ -103,9 +93,6 @@ export function stepsEqual(a: StepKey, b: StepKey): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === "patient" && b.kind === "patient") {
     return a.modalityIndex === b.modalityIndex && a.patientIndex === b.patientIndex;
-  }
-  if (a.kind === "summary" && b.kind === "summary") {
-    return a.modalityIndex === b.modalityIndex;
   }
   return true;
 }
