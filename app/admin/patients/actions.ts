@@ -1,12 +1,13 @@
-"use server"
+"use server";
 
-import { prisma } from "@/lib/prisma"
+import { prisma } from "@/lib/prisma";
 
 export type GlossaryEntry = {
-  label: string
-  definition?: string
-  value_labels?: Record<string, string>
-}
+  label: string;
+  definition?: string;
+  value_labels?: Record<string, string>;
+  valueMap?: Record<string, string>;
+};
 
 export async function getPatients(modelType?: string) {
   return prisma.patient.findMany({
@@ -23,7 +24,7 @@ export async function getPatients(modelType?: string) {
       },
     },
     orderBy: { externalId: "asc" },
-  })
+  });
 }
 
 export async function getPatient(id: string) {
@@ -34,14 +35,14 @@ export async function getPatient(id: string) {
         orderBy: [{ modality: "asc" }, { method: "asc" }],
       },
     },
-  })
+  });
 }
 
 export async function updatePatientNotes(id: string, notes: string | null) {
   await prisma.patient.update({
     where: { id },
     data: { notes },
-  })
+  });
 }
 
 export async function getGlossaryMap(
@@ -53,22 +54,26 @@ export async function getGlossaryMap(
         where: { localeId: { in: [locale, "en"] } },
       },
     },
-  })
+  });
 
-  const map: Record<string, GlossaryEntry> = {}
-
+  const map: Record<string, GlossaryEntry> = {};
   for (const term of terms) {
     const translation =
       term.translations.find((t) => t.localeId === locale) ??
-      term.translations.find((t) => t.localeId === "en")
-
+      term.translations.find((t) => t.localeId === "en");
     if (translation) {
+      if (term.term === "seizoen") {
+        console.log("RAW TRANSLATION:", JSON.stringify(translation));
+      }
+
       map[term.term] = {
         label: translation.label,
         definition: translation.definition,
-      }
+        ...(translation.valueMap
+          ? { valueMap: translation.valueMap as Record<string, string> }
+          : {}),
+      };
     }
   }
-
-  return map
+  return map;
 }

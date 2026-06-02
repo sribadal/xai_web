@@ -1,5 +1,6 @@
 import type { ModelType } from "./types"
 
+/** Clinical reference ranges for plausibility checks. */
 const PLAUSIBLE_RANGES: Record<string, [number, number]> = {
   ca199: [0, 10000],
   bilirubine: [0, 500],
@@ -18,7 +19,19 @@ const PLAUSIBLE_RANGES: Record<string, [number, number]> = {
   gebrgewicht: [25, 200],
   klintumafm: [0, 999],
   patumafm: [0, 999],
+  neutrofielen: [0, 50],
+  trombocyten: [0, 1200],
 }
+
+/** Features on a normalised 0–1 scale where values outside 0–1 are implausible. */
+const NORMALISED_FEATURES = new Set([
+  "ts_surg",
+  "ts_syst",
+  "surgery_time_norm",
+  "chemo_time_norm",
+  "time since surgery",
+  "time since systemic therapy",
+])
 
 export function lookupPlausibleRange(feature: string): [number, number] | null {
   const key = feature.toLowerCase().replace(/[^a-z0-9]/g, "")
@@ -34,18 +47,20 @@ export function detectImplausibility(
   cfRaw: number | string | null,
   modelType: ModelType,
 ): { implausible: boolean; reason?: string } {
-  if (modelType === "condor") {
-    if (typeof cfRaw === "number" && Math.abs(cfRaw) > 10) {
+  if (typeof cfRaw !== "number") return { implausible: false }
+
+  // Normalised 0–1 features: anything outside 0–1 is implausible
+  if (NORMALISED_FEATURES.has(feature)) {
+    if (cfRaw < -0.05 || cfRaw > 1.05) {
       return {
         implausible: true,
-        reason: "Counterfactual is far outside the training distribution.",
+        reason: "Value is outside the valid 0–1 range for this feature.",
       }
     }
     return { implausible: false }
   }
 
-  if (typeof cfRaw !== "number") return { implausible: false }
-
+  // Clinical range check (same logic for both RSF and ConDOR)
   const range = lookupPlausibleRange(feature)
   if (range) {
     const [lo, hi] = range
@@ -57,6 +72,7 @@ export function detectImplausibility(
     }
   }
 
+  // Extreme ratio check: flag if the change is 50x+ the original
   if (typeof originalRaw === "number" && originalRaw !== 0 && cfRaw !== 0) {
     const ratio =
       Math.abs(cfRaw) > Math.abs(originalRaw)

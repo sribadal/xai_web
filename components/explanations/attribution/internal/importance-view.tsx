@@ -56,7 +56,7 @@ export function ImportanceView({
   })
 
   const direction = getDirectionLabels(modelType, null)
-  const explanation = getMethodExplanation(method)
+  const explanation = getMethodExplanation(method, modelType)
   const totalAvailable = Object.keys(filteredContent).length
 
   return (

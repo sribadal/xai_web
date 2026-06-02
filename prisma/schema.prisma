@@ -25,15 +25,15 @@ model Locale {
 }
 
 model Patient {
-  id         String   @id @default(uuid())
-  externalId String   @map("external_id")
-  modelType  String   @map("model_type")
-  features   Json
-  featuresRaw Json?   @map("features_raw")
-  prediction Json
-  notes      String?
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  externalId  String   @map("external_id")
+  modelType   String   @map("model_type")
+  features    Json
+  featuresRaw Json?    @map("features_raw")
+  prediction  Json
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   explanations    Explanation[]
   sessionPatients SessionPatient[]
@@ -188,6 +188,7 @@ model GlossaryTermTranslation {
   localeId       String @map("locale_id")
   label          String
   definition     String
+  valueMap       Json?  @map("value_map")
 
   glossaryTerm GlossaryTerm @relation(fields: [glossaryTermId], references: [id], onDelete: Cascade)
   locale       Locale       @relation(fields: [localeId], references: [id])
@@ -282,12 +283,12 @@ model SessionPatient {
 }
 
 model Response {
-  id           String   @id @default(uuid())
-  sessionId    String   @map("session_id")
-  questionId   String   @map("question_id")
+  id         String   @id @default(uuid())
+  sessionId  String   @map("session_id")
+  questionId String   @map("question_id")
 
-  patientId    String?   @map("patient_id")
-  modality     Modality?
+  patientId  String?   @map("patient_id")
+  modality   Modality?
 
   openText     String?   @map("open_text")
   rankingOrder String[]  @map("ranking_order")

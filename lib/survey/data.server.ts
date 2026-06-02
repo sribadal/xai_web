@@ -42,7 +42,9 @@ export async function getQuestionsByTag(surveyId: string, tag: string) {
   });
 }
 
-export type LoadedQuestion = Awaited<ReturnType<typeof getQuestionsByTag>>[number];
+export type LoadedQuestion = Awaited<
+  ReturnType<typeof getQuestionsByTag>
+>[number];
 
 export async function getExistingResponses(
   sessionId: string,
@@ -112,6 +114,7 @@ export async function getSurveyMethod(
 export type GlossaryEntry = {
   label: string;
   definition: string;
+  valueMap?: Record<string, string>;
 };
 
 export async function getGlossary(
@@ -127,7 +130,13 @@ export async function getGlossary(
       term.translations.find((t) => t.localeId === locale) ??
       term.translations[0];
     if (!tr) continue;
-    out[term.term] = { label: tr.label, definition: tr.definition };
+    out[term.term] = {
+      label: tr.label,
+      definition: tr.definition,
+      ...(tr.valueMap
+        ? { valueMap: tr.valueMap as Record<string, string> }
+        : {}),
+    };
   }
   return out;
 }

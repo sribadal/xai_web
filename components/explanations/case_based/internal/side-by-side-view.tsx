@@ -69,6 +69,8 @@ const RESERVED_FIELD_KEYS = new Set<string>([
   ...TREATMENT_FIELD_KEYS,
 ]);
 
+type FilterMode = "all" | "shared" | "differing";
+
 type Props = {
   cases: CaseRecord[];
   queryFeatures: Record<string, unknown>;
@@ -87,19 +89,20 @@ export function SideBySideView({
   glossary,
   isPrototype = false,
 }: Props) {
-  const [showOnlyDiffering, setShowOnlyDiffering] = useState(false);
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const querySource = queryRawFeatures ?? queryFeatures;
+
   const baselineKeys = useMemo(
-  () =>
-    Object.keys(querySource).filter(
-      (k) =>
-        !k.startsWith("_") &&
-        querySource[k] != null &&
-        !RESERVED_FIELD_KEYS.has(k) &&
-        cases.some((c) => c[k] != null),  // NEW
-    ),
-  [querySource, cases],
-);
+    () =>
+      Object.keys(querySource).filter(
+        (k) =>
+          !k.startsWith("_") &&
+          querySource[k] != null &&
+          !RESERVED_FIELD_KEYS.has(k) &&
+          cases.some((c) => c[k] != null),
+      ),
+    [querySource, cases],
+  );
 
   const differingKeys = useMemo(() => {
     const set = new Set<string>();
@@ -115,6 +118,23 @@ export function SideBySideView({
     return set;
   }, [baselineKeys, querySource, cases]);
 
+  const sharedKeys = useMemo(
+    () => baselineKeys.filter((k) => !differingKeys.has(k)),
+    [baselineKeys, differingKeys],
+  );
+
+  const matchCounts = useMemo(
+    () =>
+      cases.map((c) => {
+        let matches = 0;
+        for (const key of baselineKeys) {
+          if (valuesEqual(querySource[key], c[key])) matches++;
+        }
+        return matches;
+      }),
+    [cases, baselineKeys, querySource],
+  );
+
   if (!cases || cases.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -123,9 +143,26 @@ export function SideBySideView({
     );
   }
 
-  const visibleBaselineKeys = showOnlyDiffering
-    ? baselineKeys.filter((k) => differingKeys.has(k))
-    : baselineKeys;
+  const visibleGroups: { heading: string | null; keys: string[] }[] =
+    filterMode === "shared"
+      ? [{ heading: null, keys: sharedKeys }]
+      : filterMode === "differing"
+        ? [{ heading: null, keys: baselineKeys.filter((k) => differingKeys.has(k)) }]
+        : [
+            ...(sharedKeys.length > 0
+              ? [{ heading: "Shared characteristics", keys: sharedKeys }]
+              : []),
+            ...(differingKeys.size > 0
+              ? [
+                  {
+                    heading: "Differing characteristics",
+                    keys: baselineKeys.filter((k) => differingKeys.has(k)),
+                  },
+                ]
+              : []),
+          ];
+
+  const totalVisible = visibleGroups.reduce((n, g) => n + g.keys.length, 0);
 
   const outcomeRows: ComposedRow[] = [
     {
@@ -196,16 +233,12 @@ export function SideBySideView({
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
             {cases.length} {CASE_LABEL}
             {cases.length !== 1 ? "s" : ""}
+            <span className="ml-1.5 normal-case">
+              · {sharedKeys.length} of {baselineKeys.length} baseline features
+              shared
+            </span>
           </p>
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showOnlyDiffering}
-              onChange={(e) => setShowOnlyDiffering(e.target.checked)}
-              className="h-3 w-3 cursor-pointer"
-            />
-            Only show differing baseline features
-          </label>
+          <FilterToggle value={filterMode} onChange={setFilterMode} />
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-border/50 bg-card shadow-sm">
@@ -228,6 +261,8 @@ export function SideBySideView({
                       similarity={getSimilarity(c)}
                       clusterSize={isPrototype ? getClusterSize(c) : null}
                       riskScore={isPrototype ? getRiskScore(c) : null}
+                      matchCount={matchCounts[i]}
+                      totalFeatures={baselineKeys.length}
                     />
                   </th>
                 ))}
@@ -252,21 +287,27 @@ export function SideBySideView({
               />
             )}
 
-            <BaselineSection
+            <GroupedBaselineSection
               colSpan={colSpan}
-              visibleKeys={visibleBaselineKeys}
+              groups={visibleGroups}
+              totalVisible={totalVisible}
               hasAnyBaseline={baselineKeys.length > 0}
               querySource={querySource}
               cases={cases}
               glossary={glossary}
+              differingKeys={differingKeys}
             />
           </table>
         </div>
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
           <span>
+            <span className="inline-block w-3 h-3 rounded-sm bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800/40 mr-1.5 align-middle" />
+            Values matching the current patient.
+          </span>
+          <span>
             <span className="inline-block w-3 h-3 rounded-sm bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800/40 mr-1.5 align-middle" />
-            Highlighted baseline cells differ from this patient.
+            Values differing from the current patient.
           </span>
           <span>
             Outcomes and treatments for "This patient" are withheld — the
@@ -278,6 +319,51 @@ export function SideBySideView({
     </div>
   );
 }
+
+function FilterToggle({
+  value,
+  onChange,
+}: {
+  value: FilterMode;
+  onChange: (v: FilterMode) => void;
+}) {
+  const options: { key: FilterMode; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "shared", label: "Shared" },
+    { key: "differing", label: "Differing" },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Feature filter"
+      className="inline-flex rounded-md border border-border/60 overflow-hidden text-[10px]"
+    >
+      {options.map((opt) => {
+        const active = value === opt.key;
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(opt.key)}
+            className={`px-2.5 py-1 border-l first:border-l-0 border-border/40 transition-colors cursor-pointer font-medium ${
+              active
+                ? "bg-foreground text-background"
+                : "bg-transparent text-muted-foreground hover:bg-muted/40"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Composed section (outcome / treatment) — unchanged logic
+// ---------------------------------------------------------------------------
 
 type ComposedRow = {
   label: string;
@@ -382,21 +468,26 @@ function toneCellClass(tone?: Tone): string {
   }
 }
 
-function BaselineSection({
+function GroupedBaselineSection({
   colSpan,
-  visibleKeys,
+  groups,
+  totalVisible,
   hasAnyBaseline,
   querySource,
   cases,
   glossary,
+  differingKeys,
 }: {
   colSpan: number;
-  visibleKeys: string[];
+  groups: { heading: string | null; keys: string[] }[];
+  totalVisible: number;
   hasAnyBaseline: boolean;
   querySource: Record<string, unknown>;
   cases: CaseRecord[];
   glossary?: Record<string, GlossaryEntry>;
+  differingKeys: Set<string>;
 }) {
+  let runningRowIdx = 0;
   return (
     <tbody>
       <tr>
@@ -410,11 +501,79 @@ function BaselineSection({
           </span>
         </td>
       </tr>
-      {visibleKeys.map((key, rowIdx) => {
+
+      {groups.map((group, gIdx) => {
+        const rows = group.keys.map((key) => {
+          const idx = runningRowIdx++;
+          return { key, globalIdx: idx };
+        });
+        return (
+          <GroupRows
+            key={gIdx}
+            heading={group.heading}
+            rows={rows}
+            colSpan={colSpan}
+            querySource={querySource}
+            cases={cases}
+            glossary={glossary}
+            differingKeys={differingKeys}
+          />
+        );
+      })}
+
+      {totalVisible === 0 && (
+        <tr>
+          <td
+            colSpan={colSpan}
+            className="text-center text-sm text-muted-foreground py-6"
+          >
+            {hasAnyBaseline
+              ? "No matching baseline features for this filter."
+              : "No baseline features available."}
+          </td>
+        </tr>
+      )}
+    </tbody>
+  );
+}
+
+function GroupRows({
+  heading,
+  rows,
+  colSpan,
+  querySource,
+  cases,
+  glossary,
+  differingKeys,
+}: {
+  heading: string | null;
+  rows: { key: string; globalIdx: number }[];
+  colSpan: number;
+  querySource: Record<string, unknown>;
+  cases: CaseRecord[];
+  glossary?: Record<string, GlossaryEntry>;
+  differingKeys: Set<string>;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <>
+      {heading && (
+        <tr>
+          <td
+            colSpan={colSpan}
+            className="sticky left-0 z-[1] px-3 py-1.5 bg-muted/20 text-[10px] uppercase tracking-wider font-medium text-muted-foreground border-b border-border/40"
+          >
+            {heading}
+            <span className="ml-1.5 font-normal">({rows.length})</span>
+          </td>
+        </tr>
+      )}
+      {rows.map(({ key, globalIdx }) => {
         const qv = querySource[key];
         const friendly = glossary?.[key]?.label ?? key;
         const definition = glossary?.[key]?.definition;
-        const isEven = rowIdx % 2 === 0;
+        const isDiffering = differingKeys.has(key);
+        const isEven = globalIdx % 2 === 0;
         const rowBgClass = isEven ? "bg-background" : "bg-muted/10";
         return (
           <tr
@@ -444,7 +603,7 @@ function BaselineSection({
                   className={`px-3 py-2 align-top text-[12px] border-l border-border/30 border-b border-border/30 ${
                     differs
                       ? "bg-amber-50 text-amber-900 font-medium dark:bg-amber-950/30 dark:text-amber-200"
-                      : "text-muted-foreground"
+                      : "bg-emerald-50/40 text-emerald-900 dark:bg-emerald-950/15 dark:text-emerald-200"
                   }`}
                 >
                   {formatValue(v)}
@@ -454,19 +613,7 @@ function BaselineSection({
           </tr>
         );
       })}
-      {visibleKeys.length === 0 && (
-        <tr>
-          <td
-            colSpan={colSpan}
-            className="text-center text-sm text-muted-foreground py-6"
-          >
-            {hasAnyBaseline
-              ? "No differing baseline features."
-              : "No baseline features available."}
-          </td>
-        </tr>
-      )}
-    </tbody>
+    </>
   );
 }
 
@@ -476,12 +623,16 @@ function ColumnHeader({
   similarity,
   clusterSize,
   riskScore,
+  matchCount,
+  totalFeatures,
 }: {
   label: string;
   accent?: boolean;
   similarity?: number | null;
   clusterSize?: number | null;
   riskScore?: number | null;
+  matchCount?: number;
+  totalFeatures?: number;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -498,6 +649,11 @@ function ColumnHeader({
         {typeof similarity === "number" && (
           <span className="text-muted-foreground">
             sim {(similarity * 100).toFixed(0)}%
+          </span>
+        )}
+        {typeof matchCount === "number" && typeof totalFeatures === "number" && (
+          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+            {matchCount}/{totalFeatures} match
           </span>
         )}
         {typeof clusterSize === "number" && (

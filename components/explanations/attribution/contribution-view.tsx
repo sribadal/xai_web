@@ -48,6 +48,7 @@ export function ContributionView({
     () => filterInternalLimeKeys(content),
     [content],
   )
+
   const filteredHorizonContents = useMemo(() => {
     if (!horizonContents) return undefined
     const out: Record<string, Record<string, number>> = {}
@@ -62,6 +63,15 @@ export function ContributionView({
     timeHorizon,
   })
 
+  const effectiveHorizonContents = useMemo(() => {
+    if (modelType !== "condor" || !filteredHorizonContents)
+      return filteredHorizonContents
+    const active = horizonState.effectiveSortHorizon
+    if (!active || !filteredHorizonContents[active])
+      return filteredHorizonContents
+    return { [active]: filteredHorizonContents[active] }
+  }, [modelType, filteredHorizonContents, horizonState.effectiveSortHorizon])
+
   if (Object.keys(filteredContent).length === 0) {
     return (
       <p className="text-sm text-muted-foreground">No attribution data</p>
@@ -72,7 +82,7 @@ export function ContributionView({
   const effectiveHazardFactor = 1
   const rows = buildAttributionRows({
     content: filteredContent,
-    horizonContents: filteredHorizonContents,
+    horizonContents: effectiveHorizonContents,
     sortHorizon: horizonState.effectiveSortHorizon,
     plottedHorizons: horizonState.plottedHorizons,
     topN: visibleCount,
@@ -81,7 +91,7 @@ export function ContributionView({
   })
 
   const direction = getDirectionLabels(modelType, timeHorizon)
-  const explanation = getMethodExplanation(method)
+  const explanation = getMethodExplanation(method, modelType)
 
   const hasNegativeAcrossRows = horizonState.isOverlay
     ? rows.some((r) => Object.values(r.byHorizon).some((v) => v < 0))
@@ -120,7 +130,7 @@ export function ContributionView({
           rows={rows}
           plottedHorizons={horizonState.plottedHorizons}
           activeHorizon={horizonState.effectiveSortHorizon}
-          isOverlay={horizonState.isOverlay}
+          isOverlay={modelType === "condor" ? false : horizonState.isOverlay}
           goodSign={direction.goodSign}
           glossary={glossary}
           featureValues={featureValues}

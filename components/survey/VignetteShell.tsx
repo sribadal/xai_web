@@ -13,6 +13,25 @@ import { ExpandableCard } from "./ExpandableCard";
 import { filterInternalLimeKeys } from "@/lib/feature-filters";
 import type { GlossaryEntry } from "@/lib/survey/data.server";
 
+const MODALITY_INTRO: Record<Modality, { en: string; nl: string }> = {
+  ATTRIBUTION: {
+    en: "This explanation highlights which patient characteristics had the most influence on the prediction. You will see a chart where each bar represents a characteristic — the longer the bar, the stronger its influence on the predicted outcome.",
+    nl: "Deze uitleg laat zien welke patiëntkenmerken de meeste invloed hadden op de voorspelling. U ziet een grafiek waarin elke balk een kenmerk voorstelt — hoe langer de balk, hoe sterker de invloed op de voorspelde uitkomst.",
+  },
+  COUNTERFACTUAL: {
+    en: "This explanation shows what would need to be different about this patient for the predicted outcome to change. It highlights the smallest changes in patient characteristics that would lead to a different prediction.",
+    nl: "Deze uitleg laat zien wat er anders zou moeten zijn aan deze patiënt om de voorspelde uitkomst te veranderen. Het toont de kleinste veranderingen in patiëntkenmerken die tot een andere voorspelling zouden leiden.",
+  },
+  CASE_BASED: {
+    en: "This explanation shows patients from the dataset who are most similar to the current patient. You can compare their characteristics and outcomes side by side to better understand the prediction.",
+    nl: "Deze uitleg toont patiënten uit de dataset die het meest lijken op de huidige patiënt. U kunt hun kenmerken en uitkomsten naast elkaar vergelijken om de voorspelling beter te begrijpen.",
+  },
+  RULE_BASED: {
+    en: "This explanation presents simple if-then rules that describe how the model reached its prediction. Each rule shows a combination of patient conditions and the outcome they point to.",
+    nl: "Deze uitleg presenteert eenvoudige als-dan-regels die beschrijven hoe het model tot zijn voorspelling is gekomen. Elke regel toont een combinatie van patiëntcondities en de uitkomst waar ze naar wijzen.",
+  },
+};
+
 const RSF_HORIZON_OPTIONS: { value: string; label: string }[] = [
   { value: "3_months", label: "3-month risk" },
   { value: "6_months", label: "6-month risk" },
@@ -71,6 +90,7 @@ export function VignetteShell({
   methods,
   explanations,
   glossary,
+  locale = "en",
   right,
 }: {
   modality: Modality;
@@ -87,11 +107,14 @@ export function VignetteShell({
   methods: string[];
   explanations: Explanation[];
   glossary?: Record<string, GlossaryEntry>;
+  locale?: "en" | "nl";
   right: React.ReactNode;
 }) {
   const isRsf = modelType === "rsf";
   const isCondor = modelType === "condor";
   const methodLabel = `Method ${modalityIndex + 1}`;
+
+  const modalityIntro = MODALITY_INTRO[modality]?.[locale] ?? null;
 
   const modalityIsHorizonIndependent =
     HORIZON_INDEPENDENT_MODALITIES.has(modality);
@@ -179,6 +202,20 @@ export function VignetteShell({
         <h2 style={{ marginTop: "var(--survey-space-4)" }}>
           <span className="display-italic">{methodLabel}</span> explanation
         </h2>
+        {modalityIntro && (
+          <p
+            className="survey-prose"
+            style={{
+              marginTop: "var(--survey-space-3)",
+              fontSize: "0.9rem",
+              color: "var(--survey-ink-soft)",
+              maxWidth: "56ch",
+              lineHeight: 1.55,
+            }}
+          >
+            {modalityIntro}
+          </p>
+        )}
         {methods.length > 1 && (
           <p
             className="survey-prose"

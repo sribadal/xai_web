@@ -11,7 +11,6 @@ export function PatientSummaryCard({
   const paragraphs = generatePatientNarrative(patient.featuresRaw);
   return (
     <div className="survey-card">
-      <div className="survey-card-label">Patient {patient.externalId}</div>
       <div className="survey-prose">
         {paragraphs.map((p, i) => (
           <p key={i} style={{ marginBottom: "var(--survey-space-2)" }}>

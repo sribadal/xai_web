@@ -3,18 +3,10 @@ import { buildFeatureLabel, dedupeShortLabels } from "../shared/labels"
 import type { AttributionRow } from "./internal/types"
 
 type BuildRowsArgs = {
-  /** Primary content keyed by raw feature key → value. */
   content: Record<string, number>
-  /**
-   * Optional per-horizon content for overlay mode. When present, sorting
-   * uses the horizon identified by `sortHorizon`.
-   */
   horizonContents?: Record<string, Record<string, number>>
-  /** The horizon driving sort order and tooltip headline values. */
   sortHorizon: string
-  /** Which horizons should populate each row's `byHorizon` map. */
   plottedHorizons: string[]
-  /** Visible row cap (after sorting). */
   topN: number
   /** Optional value transform (used for percent / scaled-hazard display). */
   transform?: (raw: number) => number

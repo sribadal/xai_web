@@ -1,11 +1,9 @@
 "use client"
-
 import {
   LegendSwatch,
   MethodSidebar,
   MethodSidebarSection,
 } from "@/components/explanations/shared/method-sidebar"
-import { COLOR_DECREASE, COLOR_INCREASE } from "./diff-chart"
 import { getMethodCopy } from "./method-copy"
 
 type Props = {
@@ -19,11 +17,9 @@ export function Sidebar({ method, isPrototype }: Props) {
   return (
     <MethodSidebar title={copy.title} description={copy.description}>
       <MethodSidebarSection label="Legend">
-        <LegendSwatch color={COLOR_INCREASE} label="Higher in similar case" />
-        <LegendSwatch color={COLOR_DECREASE} label="Lower in similar case" />
-        <LegendSwatch color="#f59e0b" label="Categorical difference" />
+        <LegendSwatch color="#10b981" label="Values matching the current patient" />
+        <LegendSwatch color="#f59e0b" label="Values differing from the current patient" />
       </MethodSidebarSection>
-
       <MethodSidebarSection>
         <p className="text-[10px] text-muted-foreground leading-relaxed italic">
           {isPrototype

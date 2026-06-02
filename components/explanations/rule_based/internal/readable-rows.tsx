@@ -22,7 +22,46 @@ import { conditionToSentence } from "./narrative";
 import { operatorToWords } from "./operators";
 import { parseCondition } from "./parse-condition";
 import { RangeBar } from "./range-bar";
+import { resolveOrdinalLabels, formatLabelList } from "./resolve-ordinal";
 import type { FiringRule } from "./types";
+
+const NORMALISED_FEATURES = new Set([
+  "ts_surg",
+  "ts_syst",
+  "surgery_time_norm",
+  "chemo_time_norm",
+  "time since surgery",
+  "time since systemic therapy",
+]);
+
+function describeNormalisedTime(threshold: number): string {
+  if (threshold <= 0.15) return "shortly after diagnosis";
+  if (threshold <= 0.35) return "early in the follow-up period";
+  if (threshold <= 0.65) return "midway through follow-up";
+  if (threshold <= 0.85) return "later in the follow-up period";
+  return "near the end of follow-up";
+}
+
+function CollapsibleDefinition({
+  definition,
+  m,
+}: {
+  definition?: string;
+  m: RuleBasedMessages;
+}) {
+  if (!definition) return null;
+  return (
+    <details className="pl-6">
+      <summary className="text-[10px] text-muted-foreground/50 cursor-pointer hover:text-muted-foreground/80 transition-colors select-none">
+        {(m.ui as Record<string, unknown>).showDefinition as string ??
+          "Definition"}
+      </summary>
+      <p className="text-[10px] text-muted-foreground/70 leading-relaxed mt-1">
+        {definition}
+      </p>
+    </details>
+  );
+}
 
 export function ReadableConditionRow({
   condition,
@@ -44,6 +83,9 @@ export function ReadableConditionRow({
   const threshold = parseFloat(value);
 
   const isOutcome = OUTCOME_FEATURES.has(parseFeatureKey(feature).feature);
+
+  const orWord =
+    ((m.narrative as Record<string, unknown>)?.or as string) ?? "or";
 
   const Header = () => (
     <div className="flex items-start gap-2 flex-wrap">
@@ -78,11 +120,7 @@ export function ReadableConditionRow({
             </div>
           </div>
         </div>
-        {info.definition && (
-          <p className="text-[10px] text-muted-foreground/70 pl-6 leading-relaxed">
-            {info.definition}
-          </p>
-        )}
+        <CollapsibleDefinition definition={info.definition} m={m} />
       </div>
     );
   }
@@ -109,16 +147,45 @@ export function ReadableConditionRow({
             </div>
           </div>
         </div>
-        {info.definition && (
-          <p className="text-[10px] text-muted-foreground/70 pl-6 leading-relaxed">
-            {info.definition}
-          </p>
-        )}
+        <CollapsibleDefinition definition={info.definition} m={m} />
       </div>
     );
   }
 
-  if (kind === "continuous" && operator && isThresholdInScaledSpace(rawValue, threshold)) {
+  /* ── Normalised 0–1 features (qualitative timing) ─────────────── */
+  if (
+    NORMALISED_FEATURES.has(feature) &&
+    operator &&
+    Number.isFinite(threshold)
+  ) {
+    const timing = describeNormalisedTime(threshold);
+    const isUpper = operator === "<=" || operator === "<";
+
+    return (
+      <div className="rounded-md bg-muted/40 px-3 py-2.5 border border-border/30 space-y-1">
+        <div className="flex items-start gap-2">
+          <span className="text-[10px] text-muted-foreground font-mono shrink-0 mt-0.5 w-4 text-right">
+            {index + 1}
+          </span>
+          <div className="flex-1 min-w-0 space-y-1">
+            <Header />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {isUpper ? "within" : "after"}{" "}
+              <span className="font-medium text-foreground">{timing}</span>
+            </p>
+          </div>
+        </div>
+        <CollapsibleDefinition definition={info.definition} m={m} />
+      </div>
+    );
+  }
+
+  /* ── Scaled-space continuous branch ───────────────────────────── */
+  if (
+    kind === "continuous" &&
+    operator &&
+    isThresholdInScaledSpace(rawValue, threshold)
+  ) {
     const direction = scaledDirection(operator, threshold);
 
     return (
@@ -134,15 +201,46 @@ export function ReadableConditionRow({
             </div>
           </div>
         </div>
-        {info.definition && (
-          <p className="text-[10px] text-muted-foreground/70 pl-6 leading-relaxed">
-            {info.definition}
-          </p>
-        )}
+        <CollapsibleDefinition definition={info.definition} m={m} />
       </div>
     );
   }
 
+  /* ── Ordinal valueMap branch ──────────────────────────────────── */
+  if (operator && Number.isFinite(threshold)) {
+    const ordinalLabels = resolveOrdinalLabels(
+      feature,
+      operator,
+      threshold,
+      glossary,
+    );
+
+    if (ordinalLabels) {
+      const formatted = formatLabelList(ordinalLabels, orWord);
+
+      return (
+        <div className="rounded-md bg-muted/40 px-3 py-2.5 border border-border/30 space-y-1">
+          <div className="flex items-start gap-2">
+            <span className="text-[10px] text-muted-foreground font-mono shrink-0 mt-0.5 w-4 text-right">
+              {index + 1}
+            </span>
+            <div className="flex-1 min-w-0 space-y-1">
+              <Header />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span className="text-muted-foreground/70">
+                  {operatorToWords(operator, m)}
+                </span>{" "}
+                {formatted}
+              </p>
+            </div>
+          </div>
+          <CollapsibleDefinition definition={info.definition} m={m} />
+        </div>
+      );
+    }
+  }
+
+  /* ── Fallback: generic operator + value ───────────────────────── */
   return (
     <div className="rounded-md bg-muted/40 px-3 py-2.5 border border-border/30 space-y-1">
       <div className="flex items-start gap-2">
@@ -166,14 +264,14 @@ export function ReadableConditionRow({
           <span className="text-xs">{condition}</span>
         )}
       </div>
-      {info.definition && (
-        <p className="text-[10px] text-muted-foreground/70 pl-6 leading-relaxed">
-          {info.definition}
-        </p>
-      )}
+      <CollapsibleDefinition definition={info.definition} m={m} />
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  ReadableFiringRuleRow                                              */
+/* ------------------------------------------------------------------ */
 
 export function ReadableFiringRuleRow({
   rule,
@@ -217,7 +315,9 @@ export function ReadableFiringRuleRow({
                   : "text-red-600 dark:text-red-400"
               }`}
             >
-              {isNegative ? m.ui.lowersRisk.toLowerCase() : m.ui.raisesRisk.toLowerCase()}
+              {isNegative
+                ? m.ui.lowersRisk.toLowerCase()
+                : m.ui.raisesRisk.toLowerCase()}
             </span>
           </p>
           {rule.support !== undefined && (
