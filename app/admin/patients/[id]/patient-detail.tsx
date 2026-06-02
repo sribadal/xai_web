@@ -231,12 +231,7 @@ function ExplanationRenderer({
           modelType={modelType as "rsf" | "condor"}
           prediction={prediction}
           timeHorizon={explanation.timeHorizon}
-          featureValues={
-            (rawFeatures ?? features) as Record<
-              string,
-              number | string | null
-            >
-          }
+          featureValues={{ ...(features as Record<string, unknown>), ...(featuresRaw as Record<string, unknown>) } as any}
           showTopNSelector
           horizonContents={horizonContents ?? undefined}
           showHorizonChips={false}

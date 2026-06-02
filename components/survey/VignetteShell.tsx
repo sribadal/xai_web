@@ -13,10 +13,14 @@ import { ExpandableCard } from "./ExpandableCard";
 import { filterInternalLimeKeys } from "@/lib/feature-filters";
 import type { GlossaryEntry } from "@/lib/survey/data.server";
 
-const MODALITY_INTRO: Record<Modality, { en: string; nl: string }> = {
-  ATTRIBUTION: {
-    en: "This explanation highlights which patient characteristics had the most influence on the prediction. You will see a chart where each bar represents a characteristic — the longer the bar, the stronger its influence on the predicted outcome.",
-    nl: "Deze uitleg laat zien welke patiëntkenmerken de meeste invloed hadden op de voorspelling. U ziet een grafiek waarin elke balk een kenmerk voorstelt — hoe langer de balk, hoe sterker de invloed op de voorspelde uitkomst.",
+const MODALITY_INTRO: Record<string, { en: string; nl: string }> = {
+  ATTRIBUTION_rsf: {
+    en: "This explanation highlights which patient characteristics had the most influence on the survival prediction. Green bars (left) indicate features that lower mortality risk; red bars (right) indicate features that increase it. Longer bars have a stronger effect.",
+    nl: "Deze uitleg laat zien welke patiëntkenmerken de meeste invloed hadden op de overlevingsvoorspelling. Groene balken (rechts) duiden op kenmerken die het sterfterisico verlagen; rode balken (links) op kenmerken die het verhogen. Langere balken hebben een sterker effect.",
+  },
+  ATTRIBUTION_condor: {
+    en: "This explanation highlights which patient characteristics had the most influence on the quality-of-life prediction. Green bars (right) indicate features that improve predicted quality of life; red bars (left) indicate features that reduce it. Longer bars have a stronger effect.",
+    nl: "Deze uitleg laat zien welke patiëntkenmerken de meeste invloed hadden op de kwaliteit-van-levenvoorspelling. Groene balken (rechts) duiden op kenmerken die de voorspelde kwaliteit van leven verbeteren; rode balken (links) op kenmerken die deze verminderen. Langere balken hebben een sterker effect.",
   },
   COUNTERFACTUAL: {
     en: "This explanation shows what would need to be different about this patient for the predicted outcome to change. It highlights the smallest changes in patient characteristics that would lead to a different prediction.",
@@ -114,7 +118,10 @@ export function VignetteShell({
   const isCondor = modelType === "condor";
   const methodLabel = `Method ${modalityIndex + 1}`;
 
-  const modalityIntro = MODALITY_INTRO[modality]?.[locale] ?? null;
+  const modalityIntro =
+    MODALITY_INTRO[`${modality}_${modelType}`]?.[locale] ??
+    MODALITY_INTRO[modality]?.[locale] ??
+    null;
 
   const modalityIsHorizonIndependent =
     HORIZON_INDEPENDENT_MODALITIES.has(modality);
@@ -175,10 +182,12 @@ export function VignetteShell({
         continue;
       }
       if (!indexed.has(exp.method)) indexed.set(exp.method, new Map());
-      indexed.get(exp.method)!.set(
-        horizonKey,
-        filterInternalLimeKeys(exp.content as Record<string, number>),
-      );
+      indexed
+        .get(exp.method)!
+        .set(
+          horizonKey,
+          filterInternalLimeKeys(exp.content as Record<string, number>),
+        );
     }
 
     const orderedKeys = horizonOptions.map((o) => o.value);
@@ -196,8 +205,7 @@ export function VignetteShell({
     <div className="survey-stage-wide">
       <div style={{ marginBottom: "var(--survey-space-7)" }}>
         <span className="modality-chip">
-          {methodLabel} ·{" "}
-          {isRsf ? "Survival model" : "Quality-of-life model"}
+          {methodLabel} · {isRsf ? "Survival model" : "Quality-of-life model"}
         </span>
         <h2 style={{ marginTop: "var(--survey-space-4)" }}>
           <span className="display-italic">{methodLabel}</span> explanation
@@ -224,8 +232,8 @@ export function VignetteShell({
               fontSize: "0.9rem",
             }}
           >
-            You will see two variants below. Please review both before
-            answering the questions on the right.
+            You will see two variants below. Please review both before answering
+            the questions on the right.
           </p>
         )}
       </div>
@@ -445,7 +453,12 @@ function MethodExplanation({
           // the admin PatientDetail call site. Falling back to features
           // would re-introduce the cat_* dummies via the value lookup.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          featureValues={(patient.featuresRaw ?? patient.features) as any}
+          featureValues={
+            {
+              ...(patient.features as Record<string, unknown>),
+              ...(patient.featuresRaw as Record<string, unknown>),
+            } as any
+          }
           showTopNSelector
           horizonContents={horizonContents}
           // The vignette controls horizon selection at the parent level

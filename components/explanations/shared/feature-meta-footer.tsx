@@ -1,6 +1,18 @@
 import { parseFeatureKey } from "@/lib/parse-feature-key"
 import type { GlossaryEntry } from "@/app/admin/patients/actions"
 
+/** ConDOR uses human-readable feature names; map back to patient record keys. */
+const FEATURE_ALIASES: Record<string, string> = {
+  "time since surgery": "ts_surg",
+  "time since systemic therapy": "ts_syst",
+  "received surgery": "had_surg",
+  "received systemic therapy": "had_syst",
+  "ongoing surgery effect": "impulse_surg",
+  "ongoing systemic therapy effect": "impulse_syst",
+  "diagnosis season": "seizoen",
+  "comorbidity score": "cci",
+}
+
 type Props = {
   rawKey: string
   glossary?: Record<string, GlossaryEntry>
@@ -10,7 +22,10 @@ type Props = {
 export function FeatureMetaFooter({ rawKey, glossary, featureValues }: Props) {
   const parsed = parseFeatureKey(rawKey)
   const entry = glossary?.[parsed.feature]
-  const patientValue = featureValues?.[parsed.feature]
+
+  const patientValue =
+    featureValues?.[parsed.feature] ??
+    featureValues?.[FEATURE_ALIASES[parsed.feature] ?? ""]
 
   const displayValue = resolvePatientValue(patientValue, entry)
   const definition = entry?.definition
@@ -38,6 +53,8 @@ function resolvePatientValue(
   entry: GlossaryEntry | undefined,
 ): string | null {
   if (value === null || value === undefined) return null
-  const label = entry?.value_labels?.[String(value)]
+  const label =
+    entry?.valueMap?.[String(value)] ??
+    entry?.value_labels?.[String(value)]
   return label ?? String(value)
 }
