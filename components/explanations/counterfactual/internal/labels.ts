@@ -1,6 +1,12 @@
 import { parseFeatureKey } from "@/lib/parse-feature-key"
 import type { GlossaryEntry } from "@/app/admin/patients/actions"
 
+/** Features stored as normalised 0–1 that represent months (×60). */
+const MONTH_SCALE_FEATURES = new Set([
+  "ts_surg", "ts_syst",
+  "time since surgery", "time since systemic therapy",
+]);
+
 export function buildLabel(
   rawKey: string,
   glossary?: Record<string, GlossaryEntry>,
@@ -39,10 +45,17 @@ export function formatNumber(v: number): string {
 export function formatValue(
   v: number | string | null,
   valueLabels?: Record<string, string>,
+  feature?: string,
 ): string {
   if (v === null) return "—"
   const label = valueLabels?.[String(v)]
   if (label) return label
+  // Convert normalised 0–1 time features to months (×60)
+  if (feature && MONTH_SCALE_FEATURES.has(feature) && typeof v === "number") {
+    const months = v * 60
+    if (months < 0.1) return "0 months"
+    return `${months.toFixed(1)} months`
+  }
   return typeof v === "number" ? formatNumber(v) : v
 }
 

@@ -1,13 +1,13 @@
 import {
   PRE_TREATMENT_CATEGORIES,
   type Actionability,
-} from "@/lib/feature-actionability"
-import type { FilterMode } from "./types"
+} from "@/lib/feature-actionability";
+import type { FilterMode } from "./types";
 
 export const CARD_SECTIONS: {
-  id: string
-  label: string
-  cats: Actionability[]
+  id: string;
+  label: string;
+  cats: Actionability[];
 }[] = [
   { id: "treatment", label: "Treatment", cats: ["treatment", "semi"] },
   { id: "demographics", label: "Demographics", cats: ["demographics"] },
@@ -16,16 +16,16 @@ export const CARD_SECTIONS: {
   { id: "tumour", label: "Tumour & staging", cats: ["tumour", "staging"] },
   { id: "metastasis", label: "Metastases", cats: ["metastasis"] },
   { id: "outcome", label: "Outcome", cats: ["outcome"] },
-]
+];
 
-const TREATMENT_CATS = new Set<Actionability>(["treatment", "semi"])
-const PRE_TREATMENT_CATS = new Set<Actionability>(PRE_TREATMENT_CATEGORIES)
+const TREATMENT_CATS = new Set<Actionability>(["treatment", "semi"]);
+const PRE_TREATMENT_CATS = new Set<Actionability>(PRE_TREATMENT_CATEGORIES);
 
 export const FILTER_MODES: {
-  id: FilterMode
-  label: string
-  includes: Set<Actionability>
-  description: string
+  id: FilterMode;
+  label: string;
+  includes: Set<Actionability>;
+  description: string;
 }[] = [
   {
     id: "treatment",
@@ -36,10 +36,10 @@ export const FILTER_MODES: {
   },
   {
     id: "clinical",
-    label: "+ Pre-treatment",
-    includes: new Set([...TREATMENT_CATS, ...PRE_TREATMENT_CATS]),
+    label: "Pre-treatment",
+    includes: PRE_TREATMENT_CATS,
     description:
-      "Treatment plus pre-treatment features: demographics, lab values, comorbidity, tumour characteristics, staging, and metastatic sites.",
+      "Pre-treatment features: demographics, lab values, comorbidity, tumour characteristics, staging, and metastatic sites.",
   },
   {
     id: "all",
@@ -53,4 +53,4 @@ export const FILTER_MODES: {
     description:
       "Every feature the model would change, including outcomes. Useful for diagnostic inspection, not for advice.",
   },
-]
+];

@@ -14,14 +14,18 @@ export type Actionability =
 const TREATMENT_FEATURES = new Set<string>([
   "tumgericht_ther", "geen_ther_type",
   "expl_chir", "chir", "chir_type", "chir_int", "chir_tech", "chir_rad",
-  "destr", "destr_type", "destr_int",
-  "rt", "rt_type", "rt_start_int",
-  "meta_rt", "meta_chir", "lok_chemo_immuno",
-  "meta_ther_code", "meta_ther_int",
-  "chemo", "target",
-  "syst_code", "syst_schemanum", "syst_start_int", "syst_stop_int",
-  "syst_kuren", "syst_chemort", "syst_prepost",
+
   "syst_aanpassing", "syst_dosisreductie",
+
+  "ts_surg", "had_surg", "impulse_surg",
+  "ts_syst", "had_syst", "impulse_syst",
+
+  "time since surgery", "time since systemic therapy",
+  "received surgery", "received systemic therapy",
+  "ongoing surgery effect", "ongoing systemic-therapy effect",
+  "tumour-directed therapy",
+  "surgery", "chemotherapy", "radiotherapy",
+  "destructive therapy",
 ])
 
 const SEMI_FEATURES = new Set<string>([

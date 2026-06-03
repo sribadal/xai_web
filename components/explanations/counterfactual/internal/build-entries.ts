@@ -63,28 +63,29 @@ export function buildEntries({
       glossary,
     )
     const actionability = getActionability(rawKey)
+
     const originalRaw = coerceScalar(
       pickValue(rawKey, rawQuery, originalFeaturesRaw, originalFeatures),
     )
     const cfRaw = coerceScalar(pickValue(rawKey, rawCf, undefined, cfRow ?? {}))
     const cfEffective = cfRaw === null ? originalRaw : cfRaw
+
     const original: CardEntry = {
       rawKey,
       feature,
       label,
       definition,
       actionability,
-      displayValue: formatValue(originalRaw, valueLabels),
+      displayValue: formatValue(originalRaw, valueLabels, feature),
       rawValue: originalRaw,
     }
-
     const counterfactual: CardEntry = {
       rawKey,
       feature,
       label,
       definition,
       actionability,
-      displayValue: formatValue(cfEffective, valueLabels),
+      displayValue: formatValue(cfEffective, valueLabels, feature),
       rawValue: cfEffective,
     }
 
@@ -103,8 +104,8 @@ export function buildEntries({
         label,
         definition,
         actionability,
-        originalDisplay: formatValue(originalRaw, valueLabels),
-        cfDisplay: formatValue(cfEffective, valueLabels),
+        originalDisplay: formatValue(originalRaw, valueLabels, feature),
+        cfDisplay: formatValue(cfEffective, valueLabels, feature),
         originalRaw,
         cfRaw: cfEffective,
         implausible,
