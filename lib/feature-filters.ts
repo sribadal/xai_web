@@ -48,6 +48,7 @@ export function filterInternalConditions(
 ): string[] {
   if (!conditions) return [];
   return conditions.filter((cond) => {
+    if (cond.toLowerCase().includes("no informative local rule")) return false;
     const featureToken = extractFeatureToken(cond);
     return !(featureToken && isInternalFeatureKey(featureToken));
   });

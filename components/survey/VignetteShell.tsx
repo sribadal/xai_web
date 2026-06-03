@@ -516,6 +516,7 @@ function MethodExplanation({
           content={content as any}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           featuresRaw={patient.featuresRaw as any}
+          modelType={modelType as "rsf" | "condor"}
           {...common}
         />
       );

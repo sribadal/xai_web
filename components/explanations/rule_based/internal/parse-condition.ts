@@ -14,5 +14,16 @@ export function parseCondition(cond: string): ParsedCondition {
       raw: cond,
     };
   }
+
+  const colonMatch = cond.match(/^(.+?)\s*:\s*(.+)$/);
+  if (colonMatch) {
+    return {
+      feature: colonMatch[1].trim(),
+      operator: "==",
+      value: colonMatch[2].trim(),
+      raw: cond,
+    };
+  }
+
   return { feature: cond, operator: "", value: "", raw: cond };
 }
