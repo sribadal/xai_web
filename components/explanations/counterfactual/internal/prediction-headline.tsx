@@ -1,4 +1,4 @@
-import { SCALE_CONFIG, type Scale } from "./scale"
+import { SCALE_CONFIG, type Scale } from "./scale";
 
 export function PredictionHeadline({
   scale,
@@ -6,12 +6,12 @@ export function PredictionHeadline({
   cfPrediction,
   changeCount,
 }: {
-  scale: Scale
-  originalPrediction: number | null
-  cfPrediction: number | null
-  changeCount: number
+  scale: Scale;
+  originalPrediction: number | null;
+  cfPrediction: number | null;
+  changeCount: number;
 }) {
-  const cfg = SCALE_CONFIG[scale]
+  const cfg = SCALE_CONFIG[scale];
 
   if (originalPrediction === null || cfPrediction === null) {
     return (
@@ -22,13 +22,13 @@ export function PredictionHeadline({
         </span>{" "}
         — the model would predict a different outcome.
       </p>
-    )
+    );
   }
 
   const improved = cfg.lowerIsBetter
     ? cfPrediction < originalPrediction
-    : cfPrediction > originalPrediction
-  const directionWord = improved ? "fall" : "rise"
+    : cfPrediction > originalPrediction;
+  const directionWord = cfPrediction > originalPrediction ? "rise" : "fall";
 
   return (
     <p className="text-sm text-foreground leading-relaxed">
@@ -53,5 +53,5 @@ export function PredictionHeadline({
       </span>
       .
     </p>
-  )
+  );
 }
