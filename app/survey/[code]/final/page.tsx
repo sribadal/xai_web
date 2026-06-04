@@ -34,6 +34,35 @@ function filterModalityRankings(
   });
 }
 
+function anonymizeRankingAnswers(
+  questions: LoadedQuestion[],
+  modalityOrder: Modality[],
+): LoadedQuestion[] {
+  const labelMap = new Map<number, string>();
+  modalityOrder.forEach((mod, i) => {
+    const value = MODALITY_BY_VALUE.indexOf(mod);
+    if (value !== -1) {
+      labelMap.set(value, `Method ${i + 1}`);
+    }
+  });
+
+  return questions.map((q) => {
+    if (q.type !== "RANKING") return q;
+    return {
+      ...q,
+      answers: q.answers.map((a) => {
+        const anon = labelMap.get(a.value);
+        if (!anon) return a;
+        return {
+          ...a,
+          label: anon,
+          translations: a.translations.map((t: any) => ({ ...t, label: anon })),
+        };
+      }),
+    };
+  });
+}
+
 export default async function Page({
   params,
 }: {
@@ -41,7 +70,7 @@ export default async function Page({
 }) {
   const { code } = await params;
   await redirectIfCompleted(code);
-  
+
   const loaded = await getSessionByCode(code);
   if (!loaded) notFound();
 
@@ -49,8 +78,8 @@ export default async function Page({
     loaded.session.surveyId,
     "final",
   );
-  const questions = filterModalityRankings(
-    rawQuestions,
+  const questions = anonymizeRankingAnswers(
+    filterModalityRankings(rawQuestions, loaded.session.modalityOrder),
     loaded.session.modalityOrder,
   );
   const existing = await getExistingResponses(
