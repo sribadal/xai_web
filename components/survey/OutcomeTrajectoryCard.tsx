@@ -55,7 +55,11 @@ export function OutcomeTrajectoryCard({
   activeHorizon,
   onHorizonChange,
 }: Props) {
-  const summary = generateModelOutputSummary(prediction, modelType, activeHorizon);
+  const summary = generateModelOutputSummary(
+    prediction,
+    modelType,
+    activeHorizon,
+  );
 
   return (
     <>
@@ -118,7 +122,10 @@ function RsfMortalityTrajectory({
     data.push({ days: times[i], mortality: (1 - values[i]) * 100 });
   }
   if (data.length > 0 && data[data.length - 1].days < RSF_MAX_DAYS) {
-    data.push({ days: RSF_MAX_DAYS, mortality: data[data.length - 1].mortality });
+    data.push({
+      days: RSF_MAX_DAYS,
+      mortality: data[data.length - 1].mortality,
+    });
   }
 
   const maxMortality = data.reduce((m, d) => Math.max(m, d.mortality), 0);
@@ -140,7 +147,10 @@ function RsfMortalityTrajectory({
     <>
       <div style={{ width: "100%", height: 160, marginTop: 4 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+          <AreaChart
+            data={data}
+            margin={{ top: 8, right: 12, bottom: 4, left: 0 }}
+          >
             <CartesianGrid stroke={GRID_STROKE} vertical={false} />
             <XAxis
               type="number"
@@ -192,13 +202,15 @@ function RsfMortalityTrajectory({
         </ResponsiveContainer>
       </div>
 
-      <HorizonPills
-        horizons={horizonPills}
-        activeValue={activeHorizon}
-        onChange={onHorizonChange}
-        accentColor={RSF_COLOR_ACCENT}
-        accentBg={RSF_ACCENT_BG}
-      />
+      {onHorizonChange && (
+        <HorizonPills
+          horizons={horizonPills}
+          activeValue={activeHorizon}
+          onChange={onHorizonChange}
+          accentColor={RSF_COLOR_ACCENT}
+          accentBg={RSF_ACCENT_BG}
+        />
+      )}
     </>
   );
 }
@@ -252,7 +264,10 @@ function CondorQolTrajectory({
     <>
       <div style={{ width: "100%", height: 160, marginTop: 4 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+          <LineChart
+            data={points}
+            margin={{ top: 8, right: 12, bottom: 4, left: 0 }}
+          >
             <CartesianGrid stroke={GRID_STROKE} vertical={false} />
             <XAxis
               type="number"
@@ -276,7 +291,11 @@ function CondorQolTrajectory({
               stroke={CONDOR_COLOR}
               strokeWidth={1.5}
               dot={{ r: 3, fill: CONDOR_COLOR, stroke: CONDOR_COLOR }}
-              activeDot={{ r: 5, fill: CONDOR_COLOR_ACCENT, stroke: CONDOR_COLOR_ACCENT }}
+              activeDot={{
+                r: 5,
+                fill: CONDOR_COLOR_ACCENT,
+                stroke: CONDOR_COLOR_ACCENT,
+              }}
               isAnimationActive={false}
             />
             {activeMonth !== undefined && (
@@ -299,13 +318,15 @@ function CondorQolTrajectory({
         </ResponsiveContainer>
       </div>
 
-      <HorizonPills
-        horizons={horizonPills}
-        activeValue={activeHorizon}
-        onChange={onHorizonChange}
-        accentColor={CONDOR_COLOR_ACCENT}
-        accentBg={CONDOR_ACCENT_BG}
-      />
+      {onHorizonChange && (
+        <HorizonPills
+          horizons={horizonPills}
+          activeValue={activeHorizon}
+          onChange={onHorizonChange}
+          accentColor={CONDOR_COLOR_ACCENT}
+          accentBg={CONDOR_ACCENT_BG}
+        />
+      )}
     </>
   );
 }
@@ -350,7 +371,9 @@ function HorizonPills({
               borderRadius: 999,
               border: "none",
               cursor: onChange ? "pointer" : "default",
-              background: active ? accentBg : "var(--survey-card-alt-bg, #f1f1f0)",
+              background: active
+                ? accentBg
+                : "var(--survey-card-alt-bg, #f1f1f0)",
               color: active ? accentColor : "var(--survey-muted, #6b6b6b)",
               fontWeight: active ? 500 : 400,
               transition: "background 120ms ease",

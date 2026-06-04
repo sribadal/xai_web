@@ -210,6 +210,23 @@ export function VignetteShell({
         <h2 style={{ marginTop: "var(--survey-space-4)" }}>
           <span className="display-italic">{methodLabel}</span> explanation
         </h2>
+        {patientIndex === 1 && (
+          <p
+            className="survey-prose"
+            style={{
+              marginTop: "var(--survey-space-3)",
+              fontSize: "0.85rem",
+              padding: "var(--survey-space-3) var(--survey-space-4)",
+              borderLeft: "3px solid var(--survey-accent, #1f1f1f)",
+              background: "var(--survey-card-alt-bg, #f7f7f6)",
+              borderRadius: "0 4px 4px 0",
+              color: "var(--survey-ink, #1f1f1f)",
+            }}
+          >
+            You will now see the same patient, this time analyzed by a model
+            that predicts quality of life instead of survival.
+          </p>
+        )}
         {modalityIntro && (
           <p
             className="survey-prose"
@@ -250,8 +267,12 @@ export function VignetteShell({
             <OutcomeTrajectoryCard
               prediction={patient.prediction}
               modelType={modelType}
-              activeHorizon={timeHorizon}
-              onHorizonChange={setTimeHorizon}
+              activeHorizon={
+                modalityIsHorizonIndependent ? undefined : timeHorizon
+              }
+              onHorizonChange={
+                modalityIsHorizonIndependent ? undefined : setTimeHorizon
+              }
             />
           </div>
 

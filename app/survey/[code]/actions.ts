@@ -10,6 +10,8 @@ import {
   serializeStep,
   deserializeStep,
   type StepKey,
+  type ModalityIndex,
+  type PatientIndex,
 } from "@/lib/survey/steps";
 
 const MODALITY_TO_ARRAY_INDEX: Record<Modality, number> = {
@@ -81,9 +83,7 @@ export async function startOrResumeSession(
     const p = byId.get(id);
     if (!p) throw new Error(`RSF vignette patient ${id} not found`);
     if (p.modelType !== "rsf")
-      throw new Error(
-        `Patient ${id} in RSF slot has modelType=${p.modelType}`,
-      );
+      throw new Error(`Patient ${id} in RSF slot has modelType=${p.modelType}`);
   }
   for (const id of condorIds) {
     const p = byId.get(id);
@@ -96,9 +96,7 @@ export async function startOrResumeSession(
 
   const active = await activeModalitiesForSurvey(survey.id);
   if (active.length === 0) {
-    throw new Error(
-      `Survey ${survey.id} has no fully-configured modalities`,
-    );
+    throw new Error(`Survey ${survey.id} has no fully-configured modalities`);
   }
 
   const modalityOrder = shuffle(active);
@@ -205,17 +203,160 @@ async function writeResponsesAndCursor(
   return "ok";
 }
 
+// ---------------------------------------------------------------------------
+// Completion guard: walks every required question across all sections and
+// returns the first step that's missing a response. Returns null if the
+// survey is fully answered.
+// ---------------------------------------------------------------------------
+
+async function findFirstIncompleteStep(
+  sessionId: string,
+): Promise<StepKey | null> {
+  const session = await prisma.surveySession.findUnique({
+    where: { id: sessionId },
+    include: {
+      survey: {
+        include: {
+          questions: {
+            where: { active: true, isRequired: true },
+            include: {
+              tags: { include: { tag: { include: { group: true } } } },
+            },
+          },
+        },
+      },
+      responses: {
+        include: { selectedAnswers: { select: { id: true } } },
+      },
+      sessionPatients: true,
+    },
+  });
+  if (!session) return null;
+
+  const requiredQs = session.survey.questions;
+
+  function flowTag(q: (typeof requiredQs)[number]): string | null {
+    const t = q.tags.find((t) => t.tag.group.name === "Survey flow");
+    return t?.tag.name ?? null;
+  }
+
+  function hasResponse(
+    questionId: string,
+    patientId: string | null,
+    modality: Modality | null,
+  ): boolean {
+    return session!.responses.some(
+      (r) =>
+        r.questionId === questionId &&
+        r.patientId === (patientId ?? null) &&
+        r.modality === (modality ?? null) &&
+        (r.selectedAnswers.length > 0 ||
+          (r.openText != null && r.openText.trim() !== "") ||
+          r.rankingOrder.length > 0),
+    );
+  }
+
+  // --- Background ---
+  const bgQs = requiredQs.filter((q) => flowTag(q) === "background");
+  for (const q of bgQs) {
+    if (!hasResponse(q.id, null, null)) {
+      return { kind: "background" };
+    }
+  }
+
+  // --- Per-vignette (each modality × each patient) ---
+  const perVignetteQs = requiredQs.filter((q) => flowTag(q) === "per-vignette");
+  const modalityOrder = session.modalityOrder as Modality[];
+
+  for (let mIdx = 0; mIdx < modalityOrder.length; mIdx++) {
+    const modality = modalityOrder[mIdx];
+    const rsfPatient = session.sessionPatients.find(
+      (sp) => sp.modality === modality && sp.modelType === "rsf",
+    );
+    const condorPatient = session.sessionPatients.find(
+      (sp) => sp.modality === modality && sp.modelType === "condor",
+    );
+    const patientsOrdered = [rsfPatient, condorPatient]; // 0=rsf, 1=condor
+
+    for (let pIdx = 0; pIdx < patientsOrdered.length; pIdx++) {
+      const sp = patientsOrdered[pIdx];
+      if (!sp) continue;
+      for (const q of perVignetteQs) {
+        if (!hasResponse(q.id, sp.patientId, modality)) {
+          return {
+            kind: "patient",
+            modalityIndex: mIdx as ModalityIndex,
+            patientIndex: pIdx as PatientIndex,
+          };
+        }
+      }
+    }
+  }
+
+  // --- Final ---
+  const finalQs = requiredQs.filter((q) => flowTag(q) === "final");
+  for (const q of finalQs) {
+    if (!hasResponse(q.id, null, null)) {
+      return { kind: "final" };
+    }
+  }
+
+  return null; // everything answered
+}
+
 export async function saveAndAdvance(args: {
   sessionId: string;
   code: string;
   payloads: ResponsePayload[];
   nextStep: StepKey;
 }): Promise<void> {
+  const isCompleting = args.nextStep.kind === "complete";
+
+  if (isCompleting) {
+    // Save the final page's responses but keep cursor on "final" while
+    // we validate — don't mark COMPLETED yet.
+    const result = await writeResponsesAndCursor(
+      args.sessionId,
+      args.payloads,
+      "final",
+      false,
+    );
+    if (result === "completed") {
+      revalidatePath(`/survey/${args.code}`, "layout");
+      redirect(`/survey/${args.code}/complete`);
+    }
+
+    // Walk every required question across all sections.
+    const firstIncomplete = await findFirstIncompleteStep(args.sessionId);
+    if (firstIncomplete) {
+      // Redirect participant to the first gap instead of completing.
+      await prisma.surveySession.update({
+        where: { id: args.sessionId },
+        data: { currentStepKey: serializeStep(firstIncomplete) },
+      });
+      revalidatePath(`/survey/${args.code}`, "layout");
+      redirect(stepToPath(args.code, firstIncomplete));
+    }
+
+    // All required questions answered — safe to complete.
+    await prisma.surveySession.update({
+      where: { id: args.sessionId },
+      data: {
+        currentStepKey: "complete",
+        status: "COMPLETED",
+        completedAt: new Date(),
+      },
+    });
+    revalidatePath(`/survey/${args.code}`, "layout");
+    redirect(`/survey/${args.code}/complete`);
+  }
+
+  // Normal (non-completion) advance — unchanged behaviour.
   const result = await writeResponsesAndCursor(
     args.sessionId,
     args.payloads,
     serializeStep(args.nextStep),
-    args.nextStep.kind === "complete",
+    false,
   );
   if (result === "completed") {
     revalidatePath(`/survey/${args.code}`, "layout");
