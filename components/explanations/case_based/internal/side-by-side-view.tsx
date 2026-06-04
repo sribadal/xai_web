@@ -17,6 +17,7 @@ import {
 import { getClusterSize, getRiskScore, getSimilarity } from "./helpers";
 import { Sidebar } from "./sidebar";
 import type { CaseRecord } from "./types";
+import { decodeFeatureValue } from "@/lib/feature-value-encoder";
 
 const CASE_LABEL = "Similar patient";
 
@@ -79,15 +80,18 @@ type Props = {
   method: string;
   glossary?: Record<string, GlossaryEntry>;
   isPrototype?: boolean;
+  timeHorizon?: string;
 };
 
 export function SideBySideView({
   cases,
   queryFeatures,
   queryRawFeatures,
+  queryPrediction,
   method,
   glossary,
   isPrototype = false,
+  timeHorizon,
 }: Props) {
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const querySource = queryRawFeatures ?? queryFeatures;
@@ -135,6 +139,30 @@ export function SideBySideView({
     [cases, baselineKeys, querySource],
   );
 
+  const trajectoryRow: ComposedRow | null = useMemo(() => {
+    if (!timeHorizon) return null;
+
+    const caseValues = cases.map((c) => {
+      const traj = c._trajectory as Record<string, number> | undefined;
+      const val = traj?.[timeHorizon];
+      if (val == null) return { text: "—" } as Decoded;
+      return {
+        text: val.toFixed(1),
+        tone: "neutral" as Tone,
+      } as Decoded;
+    });
+
+    if (caseValues.every((d) => d.text === "—")) return null;
+
+    const horizonLabel = timeHorizon.replace(/_/g, "-").replace(/s$/, "");
+    return {
+      label: `Predicted outcome (${horizonLabel})`,
+      definition:
+        "Model-predicted outcome for each similar patient at the selected time horizon.",
+      cases: caseValues,
+    };
+  }, [timeHorizon, cases]);
+
   if (!cases || cases.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -165,6 +193,7 @@ export function SideBySideView({
   const totalVisible = visibleGroups.reduce((n, g) => n + g.keys.length, 0);
 
   const outcomeRows: ComposedRow[] = [
+    ...(trajectoryRow ? [trajectoryRow] : []),
     {
       label: "Survival status",
       definition:
@@ -362,7 +391,7 @@ function FilterToggle({
 }
 
 // ---------------------------------------------------------------------------
-// Composed section (outcome / treatment) — unchanged logic
+// Composed section (outcome / treatment)
 // ---------------------------------------------------------------------------
 
 type ComposedRow = {
@@ -592,7 +621,7 @@ function GroupRows({
               )}
             </th>
             <td className="px-3 py-2 align-top text-[12px] text-foreground border-l border-border/30 border-b border-border/30 font-medium bg-emerald-50/30 dark:bg-emerald-950/10">
-              {formatValue(qv)}
+              {decodeFeatureValue(key, qv)}
             </td>
             {cases.map((c, i) => {
               const v = c[key];
@@ -606,7 +635,7 @@ function GroupRows({
                       : "bg-emerald-50/40 text-emerald-900 dark:bg-emerald-950/15 dark:text-emerald-200"
                   }`}
                 >
-                  {formatValue(v)}
+                  {decodeFeatureValue(key, v)}
                 </td>
               );
             })}

@@ -10,6 +10,7 @@ export type CaseBasedViewProps = {
   featuresRaw?: Record<string, unknown>
   prediction?: Record<string, unknown>
   glossary?: Record<string, GlossaryEntry>
+  timeHorizon?: string
 }
 
 export type PrototypeContent = {

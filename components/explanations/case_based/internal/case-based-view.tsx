@@ -1,4 +1,5 @@
 "use client"
+
 import { useMemo } from "react"
 import {
   filterInternalCaseRecord,
@@ -27,6 +28,7 @@ export function CaseBasedView({
   featuresRaw,
   prediction,
   glossary,
+  timeHorizon,
 }: CaseBasedViewProps) {
   const filteredFeatures = useMemo(
     () => filterInternalFeatures(features),
@@ -57,6 +59,7 @@ export function CaseBasedView({
         method={method}
         glossary={glossary}
         isPrototype
+        timeHorizon={timeHorizon}
       />
     )
   }
@@ -73,6 +76,7 @@ export function CaseBasedView({
         queryPrediction={prediction}
         method={method}
         glossary={glossary}
+        timeHorizon={timeHorizon}
       />
     )
   }

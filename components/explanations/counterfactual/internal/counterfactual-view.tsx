@@ -6,9 +6,7 @@ import {
   filterInternalFeatures,
 } from "@/lib/feature-filters"
 import { buildEntries } from "./build-entries"
-import { CARD_SECTIONS, FILTER_MODES } from "./card-sections"
 import { ExactValuesTable } from "./exact-values-table"
-import { FilterChips } from "./filter-chips"
 import { HORIZON_CUMULATIVE, sortHorizons } from "./horizons"
 import { valuesEqual } from "./labels"
 import { PredictionHeadline } from "./prediction-headline"
@@ -21,8 +19,9 @@ import type {
   ChangedFeature,
   CounterfactualViewProps,
   EntryPair,
-  FilterMode,
 } from "./types"
+
+type ViewTab = "changed" | "all"
 
 export function CounterfactualView({
   content,
@@ -36,8 +35,7 @@ export function CounterfactualView({
   glossary,
   horizonContents,
 }: CounterfactualViewProps) {
-  const [filterMode, setFilterMode] = useState<FilterMode>("clinical")
-  const [showOnlyChanged, setShowOnlyChanged] = useState(false)
+  const [viewTab, setViewTab] = useState<ViewTab>("changed")
 
   const availableHorizons = useMemo(
     () => (horizonContents ? sortHorizons(Object.keys(horizonContents)) : []),
@@ -134,47 +132,16 @@ export function CounterfactualView({
     return m
   }, [changed])
 
-  const currentFilter = FILTER_MODES.find((m) => m.id === filterMode)!
-
-  const filterCounts: Record<FilterMode, number> = useMemo(() => {
-    const counts: Record<FilterMode, number> = {
-      treatment: 0,
-      clinical: 0,
-      all: 0,
-    }
-    for (const c of changed) {
-      for (const mode of FILTER_MODES) {
-        if (mode.includes.has(c.actionability)) counts[mode.id]++
-      }
-    }
-    return counts
-  }, [changed])
-
-  const visiblePairs = useMemo(
+  const changedPairs = useMemo(
     () =>
-      pairs
-        .filter((p) => currentFilter.includes.has(p.original.actionability))
-        .filter((p) => !showOnlyChanged || changedMap.has(p.original.rawKey)),
-    [pairs, currentFilter, showOnlyChanged, changedMap],
+      pairs.filter(
+        (p) => !valuesEqual(p.original.rawValue, p.counterfactual.rawValue),
+      ),
+    [pairs],
   )
 
-  const pairsBySection = useMemo(() => {
-    const map = new Map<string, EntryPair[]>()
-    for (const section of CARD_SECTIONS) {
-      map.set(
-        section.id,
-        visiblePairs.filter((p) =>
-          section.cats.includes(p.original.actionability),
-        ),
-      )
-    }
-    return map
-  }, [visiblePairs])
-
-  const visibleChanged = changed.filter((c) =>
-    currentFilter.includes.has(c.actionability),
-  )
-  const implausibleCount = visibleChanged.filter((c) => c.implausible).length
+  const visiblePairs = viewTab === "changed" ? changedPairs : pairs
+  const implausibleCount = changed.filter((c) => c.implausible).length
 
   if (Object.keys(filteredContent).length === 0 && !cfRow) {
     return (
@@ -189,26 +156,16 @@ export function CounterfactualView({
           scale={scale}
           originalPrediction={originalPrediction}
           cfPrediction={cfPrediction}
-          changeCount={visibleChanged.length}
+          changeCount={changed.length}
         />
 
-        <div className="flex items-center justify-end gap-2 flex-wrap">
-          <div className="flex items-center gap-3 flex-wrap">
-            <FilterChips
-              mode={filterMode}
-              setMode={setFilterMode}
-              counts={filterCounts}
-            />
-            <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showOnlyChanged}
-                onChange={(e) => setShowOnlyChanged(e.target.checked)}
-                className="h-3 w-3 cursor-pointer"
-              />
-              Only show differing features
-            </label>
-          </div>
+        <div className="flex items-center justify-end">
+          <ViewToggle
+            tab={viewTab}
+            onChange={setViewTab}
+            changedCount={changedPairs.length}
+            allCount={pairs.length}
+          />
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-border/50 bg-card shadow-sm">
@@ -230,101 +187,86 @@ export function CounterfactualView({
                 </th>
               </tr>
             </thead>
-            {CARD_SECTIONS.map((section) => {
-              const sectionPairs = pairsBySection.get(section.id) ?? []
-              if (sectionPairs.length === 0) return null
-              return (
-                <tbody key={section.id}>
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className="px-3 py-1.5 text-[10px] uppercase tracking-wide text-muted-foreground/80 bg-muted/40 border-y border-border/40 font-semibold"
-                    >
-                      {section.label}
-                    </td>
-                  </tr>
-                  {sectionPairs.map((pair, rowIdx) => {
-                    const orig = pair.original
-                    const cf = pair.counterfactual
-                    const isChanged = !valuesEqual(orig.rawValue, cf.rawValue)
-                    const changedFeature = changedMap.get(orig.rawKey)
-                    const implausible = !!changedFeature?.implausible
-                    const implausibleReason = changedFeature?.implausibleReason
-                    const isEven = rowIdx % 2 === 0
-                    const rowBgClass = isEven ? "bg-background" : "bg-muted/10"
-
-                    return (
-                      <tr
-                        key={orig.rawKey}
-                        className={`${rowBgClass} hover:bg-muted/30 transition-colors group`}
-                      >
-                        <th
-                          scope="row"
-                          className={`sticky left-0 z-[1] text-left px-3 py-2 align-top text-[12px] text-foreground font-medium border-b border-border/30 ${rowBgClass} group-hover:bg-muted/30 transition-colors min-w-[200px] max-w-[260px]`}
-                        >
-                          <span className="block">{orig.label}</span>
-                          {orig.definition && (
-                            <span className="block text-[10px] text-muted-foreground mt-0.5 font-normal leading-snug">
-                              {orig.definition}
-                            </span>
-                          )}
-                        </th>
-
-                        <td className="px-3 py-2 align-top text-[12px] text-foreground border-l border-border/30 border-b border-border/30 font-medium bg-emerald-50/30 dark:bg-emerald-950/10 font-mono">
-                          {orig.displayValue}
-                        </td>
-
-                        <td
-                          className={`px-3 py-2 align-top text-[12px] border-l border-border/30 border-b border-border/30 font-mono ${
-                            isChanged
-                              ? implausible
-                                ? "bg-amber-50 dark:bg-amber-950/30"
-                                : "bg-sky-50 dark:bg-sky-950/30"
-                              : "bg-sky-50/30 dark:bg-sky-950/10"
-                          }`}
-                        >
-                          <div className="flex items-start gap-1.5 flex-wrap">
-                            <span
-                              className={
-                                isChanged
-                                  ? implausible
-                                    ? "text-amber-900 font-medium dark:text-amber-200"
-                                    : "text-sky-900 font-medium dark:text-sky-200"
-                                  : "text-muted-foreground"
-                              }
-                            >
-                              {cf.displayValue}
-                            </span>
-                            {isChanged && implausible && (
-                              <span className="inline-block text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-sans">
-                                ⚠ implausible
-                              </span>
-                            )}
-                          </div>
-                          {isChanged && implausibleReason && (
-                            <span className="block text-[10px] text-muted-foreground/80 mt-0.5 leading-snug font-normal font-sans">
-                              {implausibleReason}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              )
-            })}
-            {visiblePairs.length === 0 && (
-              <tbody>
+            <tbody>
+              {visiblePairs.length === 0 ? (
                 <tr>
                   <td
                     colSpan={3}
                     className="text-center text-sm text-muted-foreground py-6"
                   >
-                    No features match the current filter.
+                    No features to show.
                   </td>
                 </tr>
-              </tbody>
-            )}
+              ) : (
+                visiblePairs.map((pair, rowIdx) => {
+                  const orig = pair.original
+                  const cf = pair.counterfactual
+                  const isChanged = !valuesEqual(orig.rawValue, cf.rawValue)
+                  const changedFeature = changedMap.get(orig.rawKey)
+                  const implausible = !!changedFeature?.implausible
+                  const implausibleReason = changedFeature?.implausibleReason
+                  const isEven = rowIdx % 2 === 0
+                  const rowBgClass = isEven ? "bg-background" : "bg-muted/10"
+
+                  return (
+                    <tr
+                      key={orig.rawKey}
+                      className={`${rowBgClass} hover:bg-muted/30 transition-colors group`}
+                    >
+                      <th
+                        scope="row"
+                        className={`sticky left-0 z-[1] text-left px-3 py-2 align-top text-[12px] text-foreground font-medium border-b border-border/30 ${rowBgClass} group-hover:bg-muted/30 transition-colors min-w-[200px] max-w-[260px]`}
+                      >
+                        <span className="block">{orig.label}</span>
+                        {orig.definition && (
+                          <span className="block text-[10px] text-muted-foreground mt-0.5 font-normal leading-snug">
+                            {orig.definition}
+                          </span>
+                        )}
+                      </th>
+
+                      <td className="px-3 py-2 align-top text-[12px] text-foreground border-l border-border/30 border-b border-border/30 font-medium bg-emerald-50/30 dark:bg-emerald-950/10 font-mono">
+                        {orig.displayValue}
+                      </td>
+
+                      <td
+                        className={`px-3 py-2 align-top text-[12px] border-l border-border/30 border-b border-border/30 font-mono ${
+                          isChanged
+                            ? implausible
+                              ? "bg-amber-50 dark:bg-amber-950/30"
+                              : "bg-sky-50 dark:bg-sky-950/30"
+                            : "bg-sky-50/30 dark:bg-sky-950/10"
+                        }`}
+                      >
+                        <div className="flex items-start gap-1.5 flex-wrap">
+                          <span
+                            className={
+                              isChanged
+                                ? implausible
+                                  ? "text-amber-900 font-medium dark:text-amber-200"
+                                  : "text-sky-900 font-medium dark:text-sky-200"
+                                : "text-muted-foreground"
+                            }
+                          >
+                            {cf.displayValue}
+                          </span>
+                          {isChanged && implausible && (
+                            <span className="inline-block text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-sans">
+                              ⚠ implausible
+                            </span>
+                          )}
+                        </div>
+                        {isChanged && implausibleReason && (
+                          <span className="block text-[10px] text-muted-foreground/80 mt-0.5 leading-snug font-normal font-sans">
+                            {implausibleReason}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
           </table>
         </div>
 
@@ -339,19 +281,62 @@ export function CounterfactualView({
           </span>
         </p>
 
-        <ExactValuesTable changed={visibleChanged} />
+        <ExactValuesTable changed={changed} />
       </div>
 
       <Sidebar
         method={method}
         modelType={modelType}
-        changedCount={visibleChanged.length}
+        changedCount={changed.length}
         implausibleCount={implausibleCount}
-        currentFilter={currentFilter}
         horizons={availableHorizons}
         activeHorizon={effectiveHorizon}
         onSelectHorizon={setActiveHorizon}
       />
+    </div>
+  )
+}
+
+function ViewToggle({
+  tab,
+  onChange,
+  changedCount,
+  allCount,
+}: {
+  tab: ViewTab
+  onChange: (t: ViewTab) => void
+  changedCount: number
+  allCount: number
+}) {
+  const options: { key: ViewTab; label: string }[] = [
+    { key: "changed", label: `Changed (${changedCount})` },
+    { key: "all", label: `All (${allCount})` },
+  ]
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Feature view"
+      className="inline-flex rounded-md border border-border/60 overflow-hidden text-[10px]"
+    >
+      {options.map((opt) => {
+        const active = tab === opt.key
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(opt.key)}
+            className={`px-2.5 py-1 border-l first:border-l-0 border-border/40 transition-colors cursor-pointer font-medium ${
+              active
+                ? "bg-foreground text-background"
+                : "bg-transparent text-muted-foreground hover:bg-muted/40"
+            }`}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

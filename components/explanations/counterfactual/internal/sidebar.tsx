@@ -2,7 +2,6 @@ import {
   MethodSidebar,
   MethodSidebarSection,
 } from "../../shared/method-sidebar"
-import { FILTER_MODES } from "./card-sections"
 import { HorizonChips } from "./horizon-chips"
 import { getMethodExplanation } from "./method-copy"
 import type { ModelType } from "./types"
@@ -12,7 +11,6 @@ export function Sidebar({
   modelType,
   changedCount,
   implausibleCount,
-  currentFilter,
   horizons,
   activeHorizon,
   onSelectHorizon,
@@ -21,7 +19,6 @@ export function Sidebar({
   modelType: ModelType
   changedCount: number
   implausibleCount: number
-  currentFilter: (typeof FILTER_MODES)[number]
   horizons: string[]
   activeHorizon: string
   onSelectHorizon: (h: string) => void
@@ -50,15 +47,9 @@ export function Sidebar({
 
       <MethodSidebarSection label="How to read this">
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          The left card is this patient now. The right card is the alternative
-          patient the model would predict differently for. Differences are
-          highlighted; everything else is identical between the two.
-        </p>
-      </MethodSidebarSection>
-
-      <MethodSidebarSection label={`Filter: ${currentFilter.label}`}>
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          {currentFilter.description}
+          The left column is this patient now. The right column is the
+          alternative profile the model would predict differently for.
+          Differences are highlighted; everything else is identical.
         </p>
         <p className="text-[11px] text-muted-foreground pt-1">
           <span className="font-mono font-medium">{changedCount}</span> feature

@@ -132,15 +132,39 @@ export function VignetteShell({
     return [];
   }, [isRsf, isCondor]);
 
+  // For horizon-independent modalities (case-based), derive available
+  // horizons from the prediction object instead of from explanation rows
+  // — case-based explanations don't carry per-horizon timeHorizon fields,
+  // but the query patient's prediction still has horizon-specific values.
   const availableHorizons = useMemo(() => {
-    if (modalityIsHorizonIndependent) return new Set<string>();
     if (horizonOptions.length === 0) return new Set<string>();
+    if (modalityIsHorizonIndependent) {
+      const found = new Set<string>();
+      const p = patient.prediction as Record<string, unknown> | null;
+      if (p) {
+        for (const opt of horizonOptions) {
+          if (
+            `mortality_risk_${opt.value}` in p ||
+            `survival_prob_${opt.value}` in p ||
+            `qol_${opt.value}` in p
+          ) {
+            found.add(opt.value);
+          }
+        }
+      }
+      return found;
+    }
     const found = new Set<string>();
     for (const e of explanations) {
       if (e.timeHorizon && e.timeHorizon !== "") found.add(e.timeHorizon);
     }
     return found;
-  }, [modalityIsHorizonIndependent, horizonOptions, explanations]);
+  }, [
+    modalityIsHorizonIndependent,
+    horizonOptions,
+    explanations,
+    patient.prediction,
+  ]);
 
   const horizonChips = useMemo(
     () => horizonOptions.filter((o) => availableHorizons.has(o.value)),
@@ -157,10 +181,14 @@ export function VignetteShell({
     return "";
   });
 
+  // For horizon-independent modalities, show all explanations regardless
+  // of the selected horizon — the explanation data doesn't vary by
+  // horizon (e.g. case-based retrieves the same similar patients).
   const visibleExplanations = useMemo(() => {
+    if (modalityIsHorizonIndependent) return explanations;
     if (!useHorizons) return explanations;
     return explanations.filter((e) => (e.timeHorizon ?? "") === timeHorizon);
-  }, [useHorizons, explanations, timeHorizon]);
+  }, [modalityIsHorizonIndependent, useHorizons, explanations, timeHorizon]);
 
   const byMethod = new Map(visibleExplanations.map((e) => [e.method, e]));
 
@@ -267,12 +295,8 @@ export function VignetteShell({
             <OutcomeTrajectoryCard
               prediction={patient.prediction}
               modelType={modelType}
-              activeHorizon={
-                modalityIsHorizonIndependent ? undefined : timeHorizon
-              }
-              onHorizonChange={
-                modalityIsHorizonIndependent ? undefined : setTimeHorizon
-              }
+              activeHorizon={timeHorizon}
+              onHorizonChange={setTimeHorizon}
             />
           </div>
 
@@ -507,6 +531,7 @@ function MethodExplanation({
           featuresRaw={patient.featuresRaw as any}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           prediction={patient.prediction as any}
+          timeHorizon={timeHorizon}
           {...common}
         />
       );

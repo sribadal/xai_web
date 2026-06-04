@@ -13,6 +13,24 @@ import type {
   EntryPair,
   ModelType,
 } from "./types"
+import { decodeFeatureValue } from "@/lib/feature-value-encoder"
+
+/**
+ * Glossary valueLabels take priority (locale-specific), then fall back
+ * to the comprehensive decoder (sentinels, units, binary vars, TNM).
+ */
+function resolveDisplay(
+  rawKey: string,
+  value: unknown,
+  valueLabels?: Record<string, string>,
+): string {
+  if (value === null || value === undefined) return "—"
+  if (valueLabels) {
+    const label = valueLabels[String(value)]
+    if (label) return label
+  }
+  return decodeFeatureValue(rawKey, value)
+}
 
 function pickValue(
   rawKey: string,
@@ -76,7 +94,7 @@ export function buildEntries({
       label,
       definition,
       actionability,
-      displayValue: formatValue(originalRaw, valueLabels, feature),
+      displayValue: resolveDisplay(rawKey, originalRaw, valueLabels),
       rawValue: originalRaw,
     }
     const counterfactual: CardEntry = {
@@ -85,7 +103,7 @@ export function buildEntries({
       label,
       definition,
       actionability,
-      displayValue: formatValue(cfEffective, valueLabels, feature),
+      displayValue: resolveDisplay(rawKey, cfEffective, valueLabels),
       rawValue: cfEffective,
     }
 
@@ -104,8 +122,8 @@ export function buildEntries({
         label,
         definition,
         actionability,
-        originalDisplay: formatValue(originalRaw, valueLabels, feature),
-        cfDisplay: formatValue(cfEffective, valueLabels, feature),
+        originalDisplay: resolveDisplay(rawKey, originalRaw, valueLabels),
+        cfDisplay: resolveDisplay(rawKey, cfEffective, valueLabels),
         originalRaw,
         cfRaw: cfEffective,
         implausible,
@@ -113,6 +131,5 @@ export function buildEntries({
       })
     }
   }
-
   return { pairs, changed }
 }
