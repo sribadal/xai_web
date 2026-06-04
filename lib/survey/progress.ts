@@ -19,11 +19,7 @@ export type SectionKey =
   | "modality-3"
   | "final";
 
-export type SectionStatus =
-  | "current"
-  | "done"
-  | "incomplete"
-  | "pending";
+export type SectionStatus = "current" | "done" | "incomplete" | "pending";
 
 export type SectionCompletionStatus = "done" | "incomplete" | "pending";
 
@@ -46,13 +42,15 @@ export type SectionProgress = {
   subSteps: SubStepProgress[] | null;
 };
 
-const SECTION_LABELS: Record<Exclude<SectionKey, `modality-${number}`>, string> =
-  {
-    consent: "Consent",
-    background: "Background",
-    practice: "Practice",
-    final: "Compare",
-  };
+const SECTION_LABELS: Record<
+  Exclude<SectionKey, `modality-${number}`>,
+  Record<string, string>
+> = {
+  consent: { en: "Consent", nl: "Toestemming" },
+  background: { en: "Background", nl: "Achtergrond" },
+  practice: { en: "Practice", nl: "Oefening" },
+  final: { en: "Compare", nl: "Vergelijken" },
+};
 
 function sectionForStep(step: StepKey): SectionKey | null {
   switch (step.kind) {
@@ -157,14 +155,14 @@ type SessionWithDeps = {
   }[];
 };
 
-function flowTagFor(q: SessionWithDeps["survey"]["questions"][number]): string | null {
+function flowTagFor(
+  q: SessionWithDeps["survey"]["questions"][number],
+): string | null {
   const tag = q.tags.find((t) => t.tag.group.name === "Survey flow");
   return tag?.tag.name ?? null;
 }
 
-function responseHasContent(
-  r: SessionWithDeps["responses"][number],
-): boolean {
+function responseHasContent(r: SessionWithDeps["responses"][number]): boolean {
   if (r.selectedAnswers.length > 0) return true;
   if (r.openText && r.openText.trim() !== "") return true;
   if (r.rankingOrder.length > 0) return true;
@@ -218,9 +216,7 @@ function sectionRequiredMissing(
       const modality = session.modalityOrder[mIdx];
       if (!modality) return false;
 
-      const perVignette = qs.filter(
-        (q) => flowTagFor(q) === "per-vignette",
-      );
+      const perVignette = qs.filter((q) => flowTagFor(q) === "per-vignette");
 
       const patientsInBlock = session.sessionPatients.filter(
         (sp) => sp.modality === modality,
@@ -294,22 +290,33 @@ function modalitySubStepCompletion(
   modalityIdx: 0 | 1 | 2 | 3,
   session: SessionWithDeps,
   currentStep: StepKey,
+  locale: string = "en",
 ): SubStepProgress[] {
   const modality = session.modalityOrder[modalityIdx];
+  const p1 = locale === "nl" ? "Patiënt 1" : "Patient 1";
+  const p2 = locale === "nl" ? "Patiënt 2" : "Patient 2";
   if (!modality) {
     return [
       {
         key: "patient-0",
-        label: "Patient 1",
-        targetStep: { kind: "patient", modalityIndex: modalityIdx, patientIndex: 0 },
+        label: p1,
+        targetStep: {
+          kind: "patient",
+          modalityIndex: modalityIdx,
+          patientIndex: 0,
+        },
         completionStatus: "pending",
       },
       {
         key: "patient-1",
-        label: "Patient 2",
-        targetStep: { kind: "patient", modalityIndex: modalityIdx, patientIndex: 1 },
+        label: p2,
+        targetStep: {
+          kind: "patient",
+          modalityIndex: modalityIdx,
+          patientIndex: 1,
+        },
         completionStatus: "pending",
-      }
+      },
     ];
   }
 
@@ -383,14 +390,11 @@ function modalitySubStepCompletion(
         patientIndex: 1,
       },
       completionStatus: patientStatus(condorPatient?.patientId, 1),
-    }
+    },
   ];
 }
 
-function sectionVisited(
-  section: SectionKey,
-  currentStep: StepKey,
-): boolean {
+function sectionVisited(section: SectionKey, currentStep: StepKey): boolean {
   const sectionStart = stepIndex(firstStepOfSection(section));
   const currentIdx = stepIndex(currentStep);
   if (sectionStart < 0 || currentIdx < 0) return false;
@@ -404,16 +408,17 @@ function isCurrentSection(section: SectionKey, currentStep: StepKey): boolean {
 function subProgressFor(
   section: SectionKey,
   currentStep: StepKey,
+  locale: string,
 ): { current: number; total: number; label: string } | null {
   if (!section.startsWith("modality-")) return null;
   if (!isCurrentSection(section, currentStep)) return null;
 
   if (currentStep.kind === "patient") {
-    return {
-      current: currentStep.patientIndex + 1,
-      total: 3,
-      label: `Patient ${currentStep.patientIndex + 1} of 2`,
-    };
+    const lbl =
+      locale === "nl"
+        ? `Patiënt ${currentStep.patientIndex + 1} van 2`
+        : `Patient ${currentStep.patientIndex + 1} of 2`;
+    return { current: currentStep.patientIndex + 1, total: 3, label: lbl };
   }
   return null;
 }
@@ -426,6 +431,7 @@ export type ProgressData = {
 
 export async function getProgress(
   sessionId: string,
+  locale: string,
 ): Promise<ProgressData | null> {
   const session = await prisma.surveySession.findUnique({
     where: { id: sessionId },
@@ -499,17 +505,18 @@ export async function getProgress(
     let label: string;
     if (key.startsWith("modality-")) {
       const idx = Number(key.split("-")[1]) as 0 | 1 | 2 | 3;
-      label = `Method ${idx + 1}`;
+      label = locale === "nl" ? `Methode ${idx + 1}` : `Method ${idx + 1}`;
     } else {
-      label = SECTION_LABELS[key as keyof typeof SECTION_LABELS];
+      const labels = SECTION_LABELS[key as keyof typeof SECTION_LABELS];
+      label = labels[locale] ?? labels.en;
     }
 
-    const sub = subProgressFor(key, currentStep);
+    const sub = subProgressFor(key, currentStep, locale);
 
     let subSteps: SubStepProgress[] | null = null;
     if (key.startsWith("modality-")) {
       const idx = Number(key.split("-")[1]) as 0 | 1 | 2 | 3;
-      subSteps = modalitySubStepCompletion(idx, sessionData, currentStep);
+      subSteps = modalitySubStepCompletion(idx, sessionData, currentStep, locale);
     }
 
     return {

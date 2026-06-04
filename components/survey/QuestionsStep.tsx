@@ -162,6 +162,7 @@ export function QuestionsStep({
         onContinue={handleContinue}
         continueDisabled={!allRequiredAnswered}
         pending={pending}
+        locale={locale}
       />
     </div>
   );
@@ -216,6 +217,7 @@ function QuestionInput({
         <OpenQuestion
           value={value.openText}
           onChange={(v) => onChange({ openText: v })}
+          locale={locale}
         />
       );
     case "RANKING":

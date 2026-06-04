@@ -25,18 +25,29 @@ export type DirectionLabels = {
 export function getDirectionLabels(
   modelType?: ModelType,
   timeHorizon?: string | null,
+  locale: string = "en",
 ): DirectionLabels {
+  const nl = locale === "nl"
+
   if (modelType === "condor") {
     return {
-      positiveLabel: "Increases QoL (better)",
-      negativeLabel: "Decreases QoL (worse)",
+      positiveLabel: nl ? "Verhoogt KvL (beter)" : "Increases QoL (better)",
+      negativeLabel: nl ? "Verlaagt KvL (slechter)" : "Decreases QoL (worse)",
       goodSign: 1,
     }
   }
-  const horizonNote = isProbabilityScale(timeHorizon) ? " mortality" : ""
+
+  const horizonNote = isProbabilityScale(timeHorizon)
+    ? (nl ? " sterfte" : " mortality")
+    : ""
+
   return {
-    positiveLabel: `Increases${horizonNote} risk (worse)`,
-    negativeLabel: `Decreases${horizonNote} risk (better)`,
+    positiveLabel: nl
+      ? `Verhoogt${horizonNote}risico (slechter)`
+      : `Increases${horizonNote} risk (worse)`,
+    negativeLabel: nl
+      ? `Verlaagt${horizonNote}risico (beter)`
+      : `Decreases${horizonNote} risk (better)`,
     goodSign: -1,
   }
 }

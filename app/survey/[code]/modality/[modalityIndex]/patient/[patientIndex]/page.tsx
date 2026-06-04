@@ -8,11 +8,7 @@ import {
   getSurveyMethod,
   getGlossary,
 } from "@/lib/survey/data.server";
-import {
-  resolveModality,
-  indexResponses,
-  DEFAULT_LOCALE,
-} from "@/lib/survey/shared";
+import { resolveModality, indexResponses } from "@/lib/survey/shared";
 import {
   isModalityIndex,
   isPatientIndex,
@@ -21,6 +17,8 @@ import {
 import { QuestionsStep } from "@/components/survey/QuestionsStep";
 import { VignetteShell } from "@/components/survey/VignetteShell";
 import { redirectIfCompleted } from "@/lib/survey/guards";
+import { getLocale } from "@/lib/survey/locale";
+
 export default async function Page({
   params,
 }: {
@@ -52,12 +50,11 @@ export default async function Page({
     modality,
   );
   const methods = methodRow ? [methodRow.method] : [];
-  // Parallel-load glossary alongside the heavier explanation/question
-  // queries. Glossary is small and cacheable, but no point serializing it.
+  const locale = await getLocale();
   const [explanations, questions, glossary] = await Promise.all([
     getExplanationsForPatient(sessionPatient.patient.id, modality, methods),
     getQuestionsByTag(loaded.session.surveyId, "per-vignette"),
-    getGlossary(DEFAULT_LOCALE),
+    getGlossary(locale),
   ]);
   const existing = await getExistingResponses(
     loaded.session.id,
@@ -74,6 +71,7 @@ export default async function Page({
       methods={methods}
       explanations={explanations}
       glossary={glossary}
+      locale={locale}
       right={
         <QuestionsStep
           code={code}
@@ -85,7 +83,7 @@ export default async function Page({
           }}
           questions={questions}
           existing={indexResponses(existing)}
-          locale={DEFAULT_LOCALE}
+          locale={locale}
           scope={{ patientId: sessionPatient.patient.id, modality }}
         />
       }

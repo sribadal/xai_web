@@ -5,6 +5,15 @@ import { saveAndAdvance } from "@/app/survey/[code]/actions";
 import { nextStep, type StepKey } from "@/lib/survey/steps";
 import { StepNav } from "./StepNav";
 
+const STATIC_T = {
+  en: {
+    consent: "I agree to participate",
+  },
+  nl: {
+    consent: "Ik ga akkoord met deelname",
+  },
+} as const;
+
 export function StaticStep({
   code,
   sessionId,
@@ -16,6 +25,7 @@ export function StaticStep({
   consentLabel,
   hideNav,
   continueLabel,
+  locale = "en",
 }: {
   code: string;
   sessionId: string;
@@ -27,9 +37,11 @@ export function StaticStep({
   consentLabel?: string;
   hideNav?: boolean;
   continueLabel?: string;
+  locale?: string;
 }) {
   const [checked, setChecked] = useState(false);
   const [pending, startTransition] = useTransition();
+  const t = STATIC_T[locale as keyof typeof STATIC_T] ?? STATIC_T.en;
 
   const handleContinue = () => {
     const next = nextStep(currentStep);
@@ -45,17 +57,22 @@ export function StaticStep({
     <div className="survey-stage">
       {eyebrow && <div className="survey-eyebrow">{eyebrow}</div>}
       <h1>{title}</h1>
-      <div className="survey-prose" style={{ marginTop: "var(--survey-space-6)" }}>
+      <div
+        className="survey-prose"
+        style={{ marginTop: "var(--survey-space-6)" }}
+      >
         {children}
       </div>
-
       {requireConsent && (
         <label className="consent-check">
-          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
-          <span>{consentLabel ?? "I agree to participate"}</span>
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => setChecked(e.target.checked)}
+          />
+          <span>{consentLabel ?? t.consent}</span>
         </label>
       )}
-
       {!hideNav && (
         <StepNav
           code={code}
@@ -64,6 +81,7 @@ export function StaticStep({
           continueDisabled={disabled}
           pending={pending}
           continueLabel={continueLabel}
+          locale={locale}
         />
       )}
     </div>

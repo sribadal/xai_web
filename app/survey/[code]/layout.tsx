@@ -6,13 +6,17 @@ import {
   stepIndex,
   TOTAL_STEPS,
 } from "@/lib/survey/steps";
+import { getLocale } from "@/lib/survey/locale";
+import { LocaleToggle } from "@/components/survey/LocaleToggle";
 import "./survey.css";
 
 function pickTitle(
   translations: { localeId: string; title: string }[] | undefined,
+  locale: string,
 ): string {
   if (!translations || translations.length === 0) return "Survey";
   return (
+    translations.find((t) => t.localeId === locale)?.title ??
     translations.find((t) => t.localeId === "en")?.title ??
     translations[0]?.title ??
     "Survey"
@@ -27,10 +31,10 @@ export default async function SurveyLayout({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
+  const locale = await getLocale();
   const loaded = await getSessionByCode(code);
-
   const surveyTitle = loaded
-    ? pickTitle(loaded.session.survey.translations)
+    ? pickTitle(loaded.session.survey.translations, locale)
     : "Survey";
 
   let progress = null;
@@ -41,7 +45,7 @@ export default async function SurveyLayout({
     const isStepperVisible = step.kind !== "intro" && step.kind !== "complete";
 
     if (isStepperVisible) {
-      progress = await getProgress(loaded.session.id);
+      progress = await getProgress(loaded.session.id, locale);
       const idx = stepIndex(step);
       if (idx >= 0) {
         stepCounter = { current: idx + 1, total: TOTAL_STEPS - 1 };
@@ -51,11 +55,15 @@ export default async function SurveyLayout({
 
   return (
     <div className="survey-root">
+      <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 16px 0" }}>
+        <LocaleToggle current={locale} />
+      </div>
       <SurveyShell
         code={code}
         title={surveyTitle}
         progress={progress}
         stepCounter={stepCounter}
+        locale={locale}
       >
         {children}
       </SurveyShell>

@@ -1,32 +1,26 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import { filterInternalLimeKeys } from "@/lib/feature-filters"
-import { getDirectionLabels } from "../shared/colors"
-import {
-  MethodSidebar,
-  MethodSidebarSection,
-} from "../shared/method-sidebar"
-import {
-  DEFAULT_TOP_N_OPTIONS,
-  TopNSelector,
-} from "../shared/top-n-selector"
-import { buildAttributionRows } from "./build-rows"
-import { ContributionChart } from "./internal/contribution-chart"
-import { ContributionLegend } from "./internal/contribution-legend"
-import { HorizonChips } from "./internal/horizon-chips"
-import { HorizonLensNote } from "./internal/horizon-lens-note"
-import { getMethodExplanation } from "./internal/method-copy"
-import { transformContributionValue } from "./internal/scale"
-import type { ContributionViewProps } from "./internal/types"
-import { useHorizonLens } from "./internal/use-horizon-lens"
+import { useMemo, useState } from "react";
+import { filterInternalLimeKeys } from "@/lib/feature-filters";
+import { getDirectionLabels } from "../shared/colors";
+import { MethodSidebar, MethodSidebarSection } from "../shared/method-sidebar";
+import { DEFAULT_TOP_N_OPTIONS, TopNSelector } from "../shared/top-n-selector";
+import { buildAttributionRows } from "./build-rows";
+import { ContributionChart } from "./internal/contribution-chart";
+import { ContributionLegend } from "./internal/contribution-legend";
+import { HorizonChips } from "./internal/horizon-chips";
+import { HorizonLensNote } from "./internal/horizon-lens-note";
+import { getMethodExplanation } from "./internal/method-copy";
+import { transformContributionValue } from "./internal/scale";
+import type { ContributionViewProps } from "./internal/types";
+import { useHorizonLens } from "./internal/use-horizon-lens";
 
 type Props = ContributionViewProps & {
-  /** The method id used to look up sidebar copy ("lime" / "deep_lift" / ...). */
-  method: string
-}
+  locale: string;
+  method: string;
+};
 
-const DEFAULT_TOP_N = 10
+const DEFAULT_TOP_N = 10;
 
 export function ContributionView({
   method,
@@ -36,50 +30,49 @@ export function ContributionView({
   featureValues,
   modelType,
   prediction,
+  locale,
   timeHorizon,
   topN = DEFAULT_TOP_N,
   showTopNSelector = false,
   topNOptions = DEFAULT_TOP_N_OPTIONS,
   showHorizonChips = true,
 }: Props) {
-  const [visibleCount, setVisibleCount] = useState(topN)
+  const [visibleCount, setVisibleCount] = useState(topN);
 
   const filteredContent = useMemo(
     () => filterInternalLimeKeys(content),
     [content],
-  )
+  );
 
   const filteredHorizonContents = useMemo(() => {
-    if (!horizonContents) return undefined
-    const out: Record<string, Record<string, number>> = {}
+    if (!horizonContents) return undefined;
+    const out: Record<string, Record<string, number>> = {};
     for (const [h, c] of Object.entries(horizonContents)) {
-      out[h] = filterInternalLimeKeys(c)
+      out[h] = filterInternalLimeKeys(c);
     }
-    return out
-  }, [horizonContents])
+    return out;
+  }, [horizonContents]);
 
   const horizonState = useHorizonLens({
     horizonContents: filteredHorizonContents,
     timeHorizon,
-  })
+  });
 
   const effectiveHorizonContents = useMemo(() => {
     if (modelType !== "condor" || !filteredHorizonContents)
-      return filteredHorizonContents
-    const active = horizonState.effectiveSortHorizon
+      return filteredHorizonContents;
+    const active = horizonState.effectiveSortHorizon;
     if (!active || !filteredHorizonContents[active])
-      return filteredHorizonContents
-    return { [active]: filteredHorizonContents[active] }
-  }, [modelType, filteredHorizonContents, horizonState.effectiveSortHorizon])
+      return filteredHorizonContents;
+    return { [active]: filteredHorizonContents[active] };
+  }, [modelType, filteredHorizonContents, horizonState.effectiveSortHorizon]);
 
   if (Object.keys(filteredContent).length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No attribution data</p>
-    )
+    return <p className="text-sm text-muted-foreground">No attribution data</p>;
   }
 
-  const scaleMode = "raw"
-  const effectiveHazardFactor = 1
+  const scaleMode = "raw";
+  const effectiveHazardFactor = 1;
   const rows = buildAttributionRows({
     content: filteredContent,
     horizonContents: effectiveHorizonContents,
@@ -88,16 +81,16 @@ export function ContributionView({
     topN: visibleCount,
     transform: (v) =>
       transformContributionValue(v, scaleMode, effectiveHazardFactor),
-  })
+  });
 
-  const direction = getDirectionLabels(modelType, timeHorizon)
-  const explanation = getMethodExplanation(method, modelType)
+  const direction = getDirectionLabels(modelType, timeHorizon, locale);
+  const explanation = getMethodExplanation(method, modelType, locale);
 
   const hasNegativeAcrossRows = horizonState.isOverlay
     ? rows.some((r) => Object.values(r.byHorizon).some((v) => v < 0))
-    : rows.some((r) => r.value < 0)
+    : rows.some((r) => r.value < 0);
 
-  const totalAvailable = Object.keys(filteredContent).length
+  const totalAvailable = Object.keys(filteredContent).length;
 
   return (
     <div className="flex gap-6">
@@ -108,12 +101,15 @@ export function ContributionView({
             lens={horizonState.lens}
             highlightedHorizon={horizonState.effectiveSortHorizon}
             onChipClick={horizonState.handleChipClick}
+            locale={locale}
           />
         )}
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Top {rows.length} feature{rows.length !== 1 ? "s" : ""}
+            {locale === "nl"
+              ? `Top ${rows.length} kenmerk${rows.length !== 1 ? "en" : ""}`
+              : `Top ${rows.length} feature${rows.length !== 1 ? "s" : ""}`}
           </p>
 
           {showTopNSelector && (
@@ -122,6 +118,7 @@ export function ContributionView({
               onChange={setVisibleCount}
               options={topNOptions}
               maxAvailable={totalAvailable}
+              locale={locale}
             />
           )}
         </div>
@@ -134,17 +131,20 @@ export function ContributionView({
           goodSign={direction.goodSign}
           glossary={glossary}
           featureValues={featureValues}
+          locale={locale}
         />
       </div>
 
       <MethodSidebar
         title={explanation.title}
         description={explanation.description}
+        locale={locale}
       >
         <MethodSidebarSection>
           <ContributionLegend
             hasNegative={hasNegativeAcrossRows}
             direction={direction}
+            locale={locale}
           />
         </MethodSidebarSection>
 
@@ -153,10 +153,11 @@ export function ContributionView({
             <HorizonLensNote
               lens={horizonState.lens}
               highlightedHorizon={horizonState.effectiveSortHorizon}
+              locale={locale}
             />
           </MethodSidebarSection>
         )}
       </MethodSidebar>
     </div>
-  )
+  );
 }

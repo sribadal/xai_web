@@ -446,10 +446,12 @@ export function ProgressStepper({
   progress,
   hidden = false,
   stepCounter = null,
+  locale = '',
 }: {
   progress: ProgressData;
   hidden?: boolean;
   stepCounter?: { current: number; total: number } | null;
+  locale: string
 }) {
   const router = useRouter();
   const pathname = usePathname() ?? "";
@@ -566,7 +568,7 @@ export function ProgressStepper({
                 marginBottom: 0,
               }}
             >
-              Step
+                {locale === "nl" ? "Stap" : "Step"}
             </p>
           </div>
         )}

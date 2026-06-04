@@ -33,6 +33,7 @@ export function ImportanceView({
   topN = DEFAULT_TOP_N,
   showTopNSelector = false,
   topNOptions = DEFAULT_TOP_N_OPTIONS,
+  locale
 }: Props) {
   const [visibleCount, setVisibleCount] = useState(topN)
 
@@ -55,8 +56,8 @@ export function ImportanceView({
     glossary,
   })
 
-  const direction = getDirectionLabels(modelType, null)
-  const explanation = getMethodExplanation(method, modelType)
+  const direction = getDirectionLabels(modelType, null, locale);
+  const explanation = getMethodExplanation(method, modelType, locale);
   const totalAvailable = Object.keys(filteredContent).length
 
   return (
@@ -73,6 +74,7 @@ export function ImportanceView({
               onChange={setVisibleCount}
               options={topNOptions}
               maxAvailable={totalAvailable}
+              locale={locale}
             />
           )}
         </div>
@@ -81,15 +83,17 @@ export function ImportanceView({
           rows={rows}
           glossary={glossary}
           featureValues={featureValues}
+          locale={locale}
         />
       </div>
 
       <MethodSidebar
         title={explanation.title}
         description={explanation.description}
+        locale={locale}
       >
         <MethodSidebarSection>
-          <ContributionLegend hasNegative={false} direction={direction} />
+          <ContributionLegend hasNegative={false} direction={direction} locale={locale} />
         </MethodSidebarSection>
       </MethodSidebar>
     </div>

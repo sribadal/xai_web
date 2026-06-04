@@ -29,6 +29,7 @@ export function CaseBasedView({
   prediction,
   glossary,
   timeHorizon,
+  locale = "en",
 }: CaseBasedViewProps) {
   const filteredFeatures = useMemo(
     () => filterInternalFeatures(features),
@@ -43,7 +44,11 @@ export function CaseBasedView({
   )
 
   if (!content) {
-    return <p className="text-sm text-muted-foreground">No data</p>
+    return (
+      <p className="text-sm text-muted-foreground">
+        {locale === "nl" ? "Geen gegevens" : "No data"}
+      </p>
+    )
   }
 
   if (isPrototypeContent(content)) {
@@ -60,6 +65,7 @@ export function CaseBasedView({
         glossary={glossary}
         isPrototype
         timeHorizon={timeHorizon}
+        locale={locale}
       />
     )
   }
@@ -77,9 +83,14 @@ export function CaseBasedView({
         method={method}
         glossary={glossary}
         timeHorizon={timeHorizon}
+        locale={locale}
       />
     )
   }
 
-  return <p className="text-sm text-muted-foreground">Unexpected data shape</p>
+  return (
+    <p className="text-sm text-muted-foreground">
+      {locale === "nl" ? "Onverwacht gegevensformaat" : "Unexpected data shape"}
+    </p>
+  )
 }

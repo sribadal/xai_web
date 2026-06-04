@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { stepToPath, prevStep, type StepKey } from "@/lib/survey/steps";
 
+const NAV_T = {
+  en: { back: "← Back", cont: "Continue", saving: "Saving…" },
+  nl: { back: "← Terug", cont: "Doorgaan", saving: "Opslaan…" },
+} as const;
+
 export function StepNav({
   code,
   currentStep,
@@ -10,6 +15,7 @@ export function StepNav({
   continueDisabled,
   continueLabel,
   pending,
+  locale = "en",
 }: {
   code: string;
   currentStep: StepKey;
@@ -17,7 +23,9 @@ export function StepNav({
   continueDisabled?: boolean;
   continueLabel?: string;
   pending?: boolean;
+  locale?: string;
 }) {
+  const t = NAV_T[locale as keyof typeof NAV_T] ?? NAV_T.en;
   const back = prevStep(currentStep);
   const backHref = back ? stepToPath(code, back) : null;
 
@@ -25,7 +33,7 @@ export function StepNav({
     <div className="survey-nav">
       {backHref ? (
         <Link href={backHref} className="survey-btn survey-btn--ghost">
-          ← Back
+          {t.back}
         </Link>
       ) : (
         <span />
@@ -36,7 +44,7 @@ export function StepNav({
         onClick={onContinue}
         disabled={continueDisabled || pending}
       >
-        {pending ? "Saving…" : continueLabel ?? "Continue"}
+        {pending ? t.saving : continueLabel ?? t.cont}
       </button>
     </div>
   );

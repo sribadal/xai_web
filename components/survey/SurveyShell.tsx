@@ -10,12 +10,14 @@ export function SurveyShell({
   title,
   progress,
   stepCounter,
+  locale,
 }: {
   children: React.ReactNode;
   code: string;
   title: string;
   progress: ProgressData | null;
   stepCounter?: { current: number; total: number } | null;
+  locale: string;
 }) {
   return (
     <div className="survey-shell">
@@ -26,7 +28,7 @@ export function SurveyShell({
       </header>
 
       {progress && (
-        <ProgressStepper progress={progress} stepCounter={stepCounter ?? null} />
+        <ProgressStepper progress={progress} stepCounter={stepCounter ?? null} locale={locale} />
       )}
 
       <main className="survey-main">{children}</main>

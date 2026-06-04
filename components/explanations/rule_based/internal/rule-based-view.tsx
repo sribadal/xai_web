@@ -26,14 +26,24 @@ function isNegativeOutcome(outcome: string): boolean {
   return /high|poor|bad|adverse/i.test(outcome);
 }
 
-function formatOutcome(outcome: string, modelType?: string): string {
+function formatOutcome(
+  outcome: string,
+  modelType?: string,
+  locale: string = "en",
+): string {
   const isGood = !isNegativeOutcome(outcome);
-  if (modelType === "rsf") {
+  if (locale === "nl") {
+    if (modelType === "rsf")
+      return isGood ? "laag sterfterisico" : "hoog sterfterisico";
+    if (modelType === "condor")
+      return isGood
+        ? "goede kwaliteit van leven"
+        : "slechte kwaliteit van leven";
+  }
+  if (modelType === "rsf")
     return isGood ? "low mortality risk" : "high mortality risk";
-  }
-  if (modelType === "condor") {
+  if (modelType === "condor")
     return isGood ? "good quality of life" : "poor quality of life";
-  }
   return outcome;
 }
 
@@ -108,7 +118,7 @@ export function RuleBasedView({
   const pathDepth = isSurrogateTree ? conditions.length : 0;
 
   const formattedOutcome = outcome
-    ? formatOutcome(outcome, modelType)
+    ? formatOutcome(outcome, modelType, locale)
     : undefined;
   const outcomeIsNegative = outcome ? isNegativeOutcome(outcome) : false;
 
@@ -197,14 +207,30 @@ export function RuleBasedView({
             {!isRuleFit && formattedOutcome && conditions.length > 0 && (
               <div className="rounded-md border border-border/40 bg-muted/20 p-3">
                 <p className="text-sm text-foreground leading-relaxed">
-                  The model predicts{" "}
-                  <span className="font-semibold">{formattedOutcome}</span>{" "}
-                  based on{" "}
-                  <span className="font-medium">
-                    {conditions.length} clinical factor
-                    {conditions.length !== 1 ? "s" : ""}
-                  </span>{" "}
-                  described below.
+                  {locale === "nl" ? (
+                    <>
+                      Het model voorspelt{" "}
+                      <span className="font-semibold">{formattedOutcome}</span>{" "}
+                      op basis van{" "}
+                      <span className="font-medium">
+                        {conditions.length} klinisch
+                        {conditions.length !== 1 ? "e" : ""} factor
+                        {conditions.length !== 1 ? "en" : ""}
+                      </span>{" "}
+                      hieronder beschreven.
+                    </>
+                  ) : (
+                    <>
+                      The model predicts{" "}
+                      <span className="font-semibold">{formattedOutcome}</span>{" "}
+                      based on{" "}
+                      <span className="font-medium">
+                        {conditions.length} clinical factor
+                        {conditions.length !== 1 ? "s" : ""}
+                      </span>{" "}
+                      described below.
+                    </>
+                  )}
                 </p>
               </div>
             )}
@@ -212,10 +238,9 @@ export function RuleBasedView({
             {/* ── No conditions: method couldn't produce rules ─────── */}
             {!isRuleFit && conditions.length === 0 && (
               <div className="rounded-md border border-border/40 bg-muted/20 p-3">
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  This explanation method could not identify specific factors
-                  for this patient. The prediction is shown above.
-                </p>
+                {locale === "nl"
+                  ? "Deze uitlegmethode kon geen specifieke factoren identificeren voor deze patiënt. De voorspelling is hierboven getoond."
+                  : "This explanation method could not identify specific factors for this patient. The prediction is shown above."}
               </div>
             )}
 
@@ -242,6 +267,7 @@ export function RuleBasedView({
                       glossary={glossary}
                       featuresRaw={featuresRaw}
                       m={m}
+                      locale={locale}
                     />
                   ))}
                 </div>
@@ -325,7 +351,7 @@ export function RuleBasedView({
             {!isRuleFit && conditions.length === 0 && outcome && (
               <div className="rounded-md bg-muted/40 px-3 py-2 border border-border/30">
                 <code className="text-xs font-mono">
-                  {"\u2192"} {outcome} (no distinguishing conditions)
+                  {"\u2192"} {outcome} ({locale === "nl" ? "geen onderscheidende condities" : "no distinguishing conditions"})
                 </code>
               </div>
             )}
@@ -422,7 +448,7 @@ export function RuleBasedView({
           {isAnchors && (precision != null || coverage != null) && (
             <div className="pt-2 border-t border-border/40 space-y-2">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                Confidence
+                {locale === "nl" ? "Betrouwbaarheid" : "Confidence"}
               </p>
               {precision != null && (
                 <MetricRow

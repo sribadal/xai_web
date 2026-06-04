@@ -11,6 +11,7 @@ export type CaseBasedViewProps = {
   prediction?: Record<string, unknown>
   glossary?: Record<string, GlossaryEntry>
   timeHorizon?: string
+  locale: string
 }
 
 export type PrototypeContent = {

@@ -19,6 +19,7 @@ export type AttributionBaseProps = {
   topN?: number
   showTopNSelector?: boolean
   topNOptions?: readonly number[]
+  locale: string;
 }
 
 export type ContributionViewProps = AttributionBaseProps & {

@@ -4,6 +4,7 @@ type Props = {
   options: readonly number[]
   maxAvailable: number
   label?: string
+  locale: string
 }
 
 export const DEFAULT_TOP_N_OPTIONS = [5, 8, 10, 15, 20] as const
@@ -14,9 +15,12 @@ export function TopNSelector({
   options,
   maxAvailable,
   label = "Show:",
+  locale
 }: Props) {
   const visibleOptions = options.filter((opt) => opt <= maxAvailable)
   if (visibleOptions.length < 2) return null
+
+  label = (locale === 'nl' ? 'Laat zien:' : 'Show:')
 
   return (
     <div className="flex items-center gap-1.5">

@@ -13,7 +13,7 @@ export type RuleBasedViewProps = {
   glossary?: Record<string, GlossaryEntry>;
   modelType?: "rsf" | "condor";
   featuresRaw?: Record<string, unknown> | null;
-  locale?: Locale;
+  locale: Locale;
 };
 
 export interface ParsedCondition {

@@ -5,10 +5,11 @@ import {
   getExistingResponses,
   type LoadedQuestion,
 } from "@/lib/survey/data.server";
-import { indexResponses, DEFAULT_LOCALE } from "@/lib/survey/shared";
+import { indexResponses } from "@/lib/survey/shared";
 import { QuestionsStep } from "@/components/survey/QuestionsStep";
 import type { Modality } from "@/lib/generated/prisma/client";
 import { redirectIfCompleted } from "@/lib/survey/guards";
+import { getLocale } from "@/lib/survey/locale";
 
 const MODALITY_BY_VALUE: Modality[] = [
   "ATTRIBUTION",
@@ -16,6 +17,23 @@ const MODALITY_BY_VALUE: Modality[] = [
   "CASE_BASED",
   "RULE_BASED",
 ];
+
+const T = {
+  en: {
+    eyebrow: "Final",
+    title: "Final preferences",
+    lede: (n: number) =>
+      `Looking back across the ${n} explanation type${n === 1 ? "" : "s"} you have seen.`,
+    method: (i: number) => `Method ${i}`,
+  },
+  nl: {
+    eyebrow: "Afsluiting",
+    title: "Eindvoorkeuren",
+    lede: (n: number) =>
+      `Terugkijkend op de ${n} uitlegtype${n === 1 ? "" : "s"} die u heeft gezien.`,
+    method: (i: number) => `Methode ${i}`,
+  },
+} as const;
 
 function filterModalityRankings(
   questions: LoadedQuestion[],
@@ -37,12 +55,13 @@ function filterModalityRankings(
 function anonymizeRankingAnswers(
   questions: LoadedQuestion[],
   modalityOrder: Modality[],
+  methodLabel: (i: number) => string,
 ): LoadedQuestion[] {
   const labelMap = new Map<number, string>();
   modalityOrder.forEach((mod, i) => {
     const value = MODALITY_BY_VALUE.indexOf(mod);
     if (value !== -1) {
-      labelMap.set(value, `Method ${i + 1}`);
+      labelMap.set(value, methodLabel(i + 1));
     }
   });
 
@@ -70,9 +89,10 @@ export default async function Page({
 }) {
   const { code } = await params;
   await redirectIfCompleted(code);
-
   const loaded = await getSessionByCode(code);
   if (!loaded) notFound();
+  const locale = await getLocale();
+  const t = T[locale];
 
   const rawQuestions = await getQuestionsByTag(
     loaded.session.surveyId,
@@ -81,23 +101,20 @@ export default async function Page({
   const questions = anonymizeRankingAnswers(
     filterModalityRankings(rawQuestions, loaded.session.modalityOrder),
     loaded.session.modalityOrder,
+    t.method,
   );
   const existing = await getExistingResponses(
     loaded.session.id,
     questions.map((q) => q.id),
     { patientId: null, modality: null },
   );
-
   const modalityCount = loaded.session.modalityOrder.length;
 
   return (
     <div className="survey-stage">
-      <div className="survey-eyebrow">Final</div>
-      <h1>Final preferences</h1>
-      <p className="survey-lede">
-        Looking back across the {modalityCount} explanation type
-        {modalityCount === 1 ? "" : "s"} you have seen.
-      </p>
+      <div className="survey-eyebrow">{t.eyebrow}</div>
+      <h1>{t.title}</h1>
+      <p className="survey-lede">{t.lede(modalityCount)}</p>
       <div style={{ marginTop: "var(--survey-space-7)" }}>
         <QuestionsStep
           code={code}
@@ -105,7 +122,7 @@ export default async function Page({
           currentStep={{ kind: "final" }}
           questions={questions}
           existing={indexResponses(existing)}
-          locale={DEFAULT_LOCALE}
+          locale={locale}
           scope={{ patientId: null, modality: null }}
         />
       </div>

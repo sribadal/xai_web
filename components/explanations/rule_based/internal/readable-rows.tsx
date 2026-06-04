@@ -24,6 +24,8 @@ import { parseCondition } from "./parse-condition";
 import { RangeBar } from "./range-bar";
 import { resolveOrdinalLabels, formatLabelList } from "./resolve-ordinal";
 import type { FiringRule } from "./types";
+import { RULE_BASED_MESSAGES } from "@/lib/rule-based-i18n";
+import { decodeFeatureValue } from "@/lib/feature-value-encoder";
 
 const NORMALISED_FEATURES = new Set([
   "ts_surg",
@@ -34,7 +36,17 @@ const NORMALISED_FEATURES = new Set([
   "time since systemic therapy",
 ]);
 
-function describeNormalisedTime(threshold: number): string {
+function describeNormalisedTime(
+  threshold: number,
+  locale: string = "en",
+): string {
+  if (locale === "nl") {
+    if (threshold <= 0.15) return "kort na diagnose";
+    if (threshold <= 0.35) return "vroeg in de follow-upperiode";
+    if (threshold <= 0.65) return "halverwege de follow-up";
+    if (threshold <= 0.85) return "later in de follow-upperiode";
+    return "aan het einde van de follow-up";
+  }
   if (threshold <= 0.15) return "shortly after diagnosis";
   if (threshold <= 0.35) return "early in the follow-up period";
   if (threshold <= 0.65) return "midway through follow-up";
@@ -53,8 +65,7 @@ function CollapsibleDefinition({
   return (
     <details className="pl-6">
       <summary className="text-[10px] text-muted-foreground/50 cursor-pointer hover:text-muted-foreground/80 transition-colors select-none">
-        {(m.ui as Record<string, unknown>).showDefinition as string ??
-          "Definition"}
+        {m.ui.showDefinition}
       </summary>
       <p className="text-[10px] text-muted-foreground/70 leading-relaxed mt-1">
         {definition}
@@ -69,12 +80,14 @@ export function ReadableConditionRow({
   glossary,
   featuresRaw,
   m,
+  locale,
 }: {
   condition: string;
   index: number;
   glossary?: Record<string, GlossaryEntry>;
   featuresRaw?: Record<string, unknown> | null;
   m: RuleBasedMessages;
+  locale: string;
 }) {
   const { feature, operator, value } = parseCondition(condition);
   const info = buildLabel(feature, glossary);
@@ -84,8 +97,7 @@ export function ReadableConditionRow({
 
   const isOutcome = OUTCOME_FEATURES.has(parseFeatureKey(feature).feature);
 
-  const orWord =
-    ((m.narrative as Record<string, unknown>)?.or as string) ?? "or";
+  const orWord = m.narrative.or;
 
   const Header = () => (
     <div className="flex items-start gap-2 flex-wrap">
@@ -158,7 +170,7 @@ export function ReadableConditionRow({
     operator &&
     Number.isFinite(threshold)
   ) {
-    const timing = describeNormalisedTime(threshold);
+    const timing = describeNormalisedTime(threshold, locale);
     const isUpper = operator === "<=" || operator === "<";
 
     return (
@@ -170,7 +182,13 @@ export function ReadableConditionRow({
           <div className="flex-1 min-w-0 space-y-1">
             <Header />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {isUpper ? "within" : "after"}{" "}
+              {isUpper
+                ? locale === "nl"
+                  ? "binnen"
+                  : "within"
+                : locale === "nl"
+                  ? "na"
+                  : "after"}{" "}
               <span className="font-medium text-foreground">{timing}</span>
             </p>
           </div>
@@ -255,7 +273,7 @@ export function ReadableConditionRow({
                 {operatorToWords(operator, m)}
               </span>
               <span className="text-xs font-mono text-blue-600 dark:text-blue-400">
-                {value}
+                {decodeFeatureValue(feature, value, locale)}
               </span>
             </div>
             <RangeBar operator={operator} value={value} feature={feature} />

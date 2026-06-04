@@ -1,4 +1,5 @@
 "use client";
+
 import { useMemo, useState } from "react";
 import type { GlossaryEntry } from "@/app/admin/patients/actions";
 import {
@@ -19,50 +20,129 @@ import { Sidebar } from "./sidebar";
 import type { CaseRecord } from "./types";
 import { decodeFeatureValue } from "@/lib/feature-value-encoder";
 
-const CASE_LABEL = "Similar patient";
+const SBS_T = {
+  en: {
+    caseLabel: "Similar patient",
+    casePlural: "s",
+    thisPatient: "This patient",
+    feature: "Feature",
+    noCases: "No similar cases retrieved",
+    shared: "Shared characteristics",
+    differing: "Differing characteristics",
+    sharedOf: (s: number, t: number) =>
+      `${s} of ${t} baseline features shared`,
+    outcome: "Outcome",
+    outcomeDesc: "What happened to similar patients",
+    treatment: "Treatment received",
+    treatmentDesc: "Therapies the similar patients underwent",
+    baseline: "Clinical baseline",
+    baselineDesc: "Pre-treatment features used to compute similarity",
+    legendMatch: "Values matching the current patient.",
+    legendDiffer: "Values differing from the current patient.",
+    legendWithheld:
+      'Outcomes and treatments for "This patient" are withheld — the model\'s prediction is what\'s being evaluated.',
+    noBaseline: "No baseline features available.",
+    noFilter: "No matching baseline features for this filter.",
+    filterAll: "All",
+    filterShared: "Shared",
+    filterDiffering: "Differing",
+    predOutcome: (h: string) => `Predicted outcome (${h})`,
+    predOutcomeDef:
+      "Model-predicted outcome for each similar patient at the selected time horizon.",
+    survivalLabel: "Survival status",
+    survivalDef:
+      "Whether the patient is alive at last follow-up or has died, and when.",
+    recurrenceLabel: "Recurrence (RFS)",
+    recurrenceDef:
+      "Curative-intent patients only: did the cancer return after treatment?",
+    progressionLabel: "Progression (PFS)",
+    progressionDef:
+      "Palliative-intent patients only: did the cancer progress further?",
+    earlyMortLabel: "Early mortality",
+    earlyMortDef:
+      "Whether the patient died within 6 months of diagnosis.",
+    tumourDirLabel: "Tumour-directed therapy",
+    tumourDirDef:
+      "Did the patient receive any anti-cancer treatment, or was treatment withheld?",
+    surgeryLabel: "Surgery",
+    surgeryDef:
+      "Type, technique, margin status, and timing of pancreatic surgery.",
+    rtLabel: "Radiotherapy",
+    rtDef: "Whether radiation therapy was given, and when.",
+    systLabel: "Systemic therapy",
+    systDef:
+      "Chemotherapy drug (first regimen), number of cycles, and timing.",
+    targetLabel: "Targeted therapy",
+    targetDef: "Targeted or immunotherapy agents.",
+  },
+  nl: {
+    caseLabel: "Vergelijkbare patiënt",
+    casePlural: "en",
+    thisPatient: "Deze patiënt",
+    feature: "Kenmerk",
+    noCases: "Geen vergelijkbare patiënten gevonden",
+    shared: "Gedeelde kenmerken",
+    differing: "Afwijkende kenmerken",
+    sharedOf: (s: number, t: number) =>
+      `${s} van ${t} basiskenmerken gedeeld`,
+    outcome: "Uitkomst",
+    outcomeDesc: "Wat er gebeurde met vergelijkbare patiënten",
+    treatment: "Ontvangen behandeling",
+    treatmentDesc: "Therapieën die de vergelijkbare patiënten ondergingen",
+    baseline: "Klinische baseline",
+    baselineDesc: "Kenmerken vóór behandeling gebruikt voor vergelijking",
+    legendMatch: "Waarden die overeenkomen met de huidige patiënt.",
+    legendDiffer: "Waarden die afwijken van de huidige patiënt.",
+    legendWithheld:
+      'Uitkomsten en behandelingen voor "Deze patiënt" zijn niet getoond — de voorspelling van het model wordt geëvalueerd.',
+    noBaseline: "Geen basiskenmerken beschikbaar.",
+    noFilter: "Geen basiskenmerken voor dit filter.",
+    filterAll: "Alle",
+    filterShared: "Gedeeld",
+    filterDiffering: "Afwijkend",
+    predOutcome: (h: string) => `Voorspelde uitkomst (${h})`,
+    predOutcomeDef:
+      "Modelvoorspelling voor elke vergelijkbare patiënt op de geselecteerde horizon.",
+    survivalLabel: "Overlevingsstatus",
+    survivalDef:
+      "Of de patiënt in leven is bij laatste follow-up of is overleden, en wanneer.",
+    recurrenceLabel: "Recidief (RFS)",
+    recurrenceDef:
+      "Alleen curatieve patiënten: is de kanker teruggekomen na behandeling?",
+    progressionLabel: "Progressie (PFS)",
+    progressionDef:
+      "Alleen palliatieve patiënten: is de kanker verder gevorderd?",
+    earlyMortLabel: "Vroege mortaliteit",
+    earlyMortDef:
+      "Of de patiënt binnen 6 maanden na diagnose is overleden.",
+    tumourDirLabel: "Tumorgerichte therapie",
+    tumourDirDef:
+      "Heeft de patiënt antikankerbehandeling ontvangen, of werd behandeling onthouden?",
+    surgeryLabel: "Chirurgie",
+    surgeryDef:
+      "Type, techniek, marge-status en timing van pancreaschirurgie.",
+    rtLabel: "Radiotherapie",
+    rtDef: "Of bestraling is gegeven, en wanneer.",
+    systLabel: "Systemische therapie",
+    systDef: "Chemotherapie (eerste schema), aantal cycli en timing.",
+    targetLabel: "Doelgerichte therapie",
+    targetDef: "Doelgerichte of immuuntherapie-middelen.",
+  },
+} as const;
 
 const OUTCOME_FIELD_KEYS = new Set<string>([
-  "vit_stat",
-  "vit_stat_int",
-  "rfs_event",
-  "rfs_int",
-  "pfs_event",
-  "pfs_int",
-  "dead_with_6months",
-  "fup_event_type",
-  "fup_event_int",
-  "qol_summary_event",
-  "qol_summary_time",
-  "qol_physical_event",
-  "qol_physical_time",
-  "qol_emotional_event",
-  "qol_emotional_time",
-  "qol_social_event",
-  "qol_social_time",
-  "qol_cognitive_event",
-  "qol_cognitive_time",
-  "qol_role_event",
-  "qol_role_time",
+  "vit_stat", "vit_stat_int", "rfs_event", "rfs_int", "pfs_event", "pfs_int",
+  "dead_with_6months", "fup_event_type", "fup_event_int",
+  "qol_summary_event", "qol_summary_time", "qol_physical_event", "qol_physical_time",
+  "qol_emotional_event", "qol_emotional_time", "qol_social_event", "qol_social_time",
+  "qol_cognitive_event", "qol_cognitive_time", "qol_role_event", "qol_role_time",
 ]);
 
 const TREATMENT_FIELD_KEYS = new Set<string>([
-  "tumgericht_ther",
-  "geen_ther_reden",
-  "geen_ther_type",
-  "chir",
-  "chir_type1",
-  "chir_tech1",
-  "chir_rad1",
-  "chir_int1",
-  "rt",
-  "rt_type1",
-  "rt_start_int1",
-  "chemo",
-  "target",
-  "syst_code1",
-  "syst_schemanum1",
-  "syst_start_int1",
-  "syst_kuren1",
+  "tumgericht_ther", "geen_ther_reden", "geen_ther_type",
+  "chir", "chir_type1", "chir_tech1", "chir_rad1", "chir_int1",
+  "rt", "rt_type1", "rt_start_int1",
+  "chemo", "target", "syst_code1", "syst_schemanum1", "syst_start_int1", "syst_kuren1",
 ]);
 
 const RESERVED_FIELD_KEYS = new Set<string>([
@@ -81,6 +161,7 @@ type Props = {
   glossary?: Record<string, GlossaryEntry>;
   isPrototype?: boolean;
   timeHorizon?: string;
+  locale?: string;
 };
 
 export function SideBySideView({
@@ -92,7 +173,9 @@ export function SideBySideView({
   glossary,
   isPrototype = false,
   timeHorizon,
+  locale = "en",
 }: Props) {
+  const t = SBS_T[locale as keyof typeof SBS_T] ?? SBS_T.en;
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const querySource = queryRawFeatures ?? queryFeatures;
 
@@ -141,33 +224,24 @@ export function SideBySideView({
 
   const trajectoryRow: ComposedRow | null = useMemo(() => {
     if (!timeHorizon) return null;
-
     const caseValues = cases.map((c) => {
       const traj = c._trajectory as Record<string, number> | undefined;
       const val = traj?.[timeHorizon];
       if (val == null) return { text: "—" } as Decoded;
-      return {
-        text: val.toFixed(1),
-        tone: "neutral" as Tone,
-      } as Decoded;
+      return { text: val.toFixed(1), tone: "neutral" as Tone } as Decoded;
     });
-
     if (caseValues.every((d) => d.text === "—")) return null;
-
     const horizonLabel = timeHorizon.replace(/_/g, "-").replace(/s$/, "");
     return {
-      label: `Predicted outcome (${horizonLabel})`,
-      definition:
-        "Model-predicted outcome for each similar patient at the selected time horizon.",
+      label: t.predOutcome(horizonLabel),
+      definition: t.predOutcomeDef,
       cases: caseValues,
     };
-  }, [timeHorizon, cases]);
+  }, [timeHorizon, cases, t]);
 
   if (!cases || cases.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        No similar cases retrieved
-      </p>
+      <p className="text-sm text-muted-foreground">{t.noCases}</p>
     );
   }
 
@@ -178,81 +252,35 @@ export function SideBySideView({
         ? [{ heading: null, keys: baselineKeys.filter((k) => differingKeys.has(k)) }]
         : [
             ...(sharedKeys.length > 0
-              ? [{ heading: "Shared characteristics", keys: sharedKeys }]
+              ? [{ heading: t.shared, keys: sharedKeys }]
               : []),
             ...(differingKeys.size > 0
-              ? [
-                  {
-                    heading: "Differing characteristics",
-                    keys: baselineKeys.filter((k) => differingKeys.has(k)),
-                  },
-                ]
+              ? [{
+                  heading: t.differing,
+                  keys: baselineKeys.filter((k) => differingKeys.has(k)),
+                }]
               : []),
           ];
 
   const totalVisible = visibleGroups.reduce((n, g) => n + g.keys.length, 0);
 
-  const outcomeRows: ComposedRow[] = [
-    ...(trajectoryRow ? [trajectoryRow] : []),
-    {
-      label: "Survival status",
-      definition:
-        "Whether the patient is alive at last follow-up or has died, and when.",
-      cases: cases.map((c) => decodeSurvival(c)),
-    },
-    {
-      label: "Recurrence (RFS)",
-      definition:
-        "Curative-intent patients only: did the cancer return after treatment?",
-      cases: cases.map((c) => decodeRecurrence(c)),
-    },
-    {
-      label: "Progression (PFS)",
-      definition:
-        "Palliative-intent patients only: did the cancer progress further?",
-      cases: cases.map((c) => decodeProgression(c)),
-    },
-    {
-      label: "Early mortality",
-      definition: "Whether the patient died within 6 months of diagnosis.",
-      cases: cases.map((c) => decodeEarlyMortality(c)),
-    },
+  const outcomeRows: ComposedRow[] = [    
+    { label: t.survivalLabel, definition: t.survivalDef, cases: cases.map((c) => decodeSurvival(c, locale)) },
+    { label: t.recurrenceLabel, definition: t.recurrenceDef, cases: cases.map((c) => decodeRecurrence(c, locale)) },
+    { label: t.progressionLabel, definition: t.progressionDef, cases: cases.map((c) => decodeProgression(c, locale)) },
+    { label: t.earlyMortLabel, definition: t.earlyMortDef, cases: cases.map((c) => decodeEarlyMortality(c, locale)) },
   ];
 
   const treatmentRows: ComposedRow[] = [
-    {
-      label: "Tumour-directed therapy",
-      definition:
-        "Did the patient receive any anti-cancer treatment, or was treatment withheld?",
-      cases: cases.map((c) => decodeTumorDirected(c)),
-    },
-    {
-      label: "Surgery",
-      definition:
-        "Type, technique, margin status, and timing of pancreatic surgery.",
-      cases: cases.map((c) => decodeSurgery(c)),
-    },
-    {
-      label: "Radiotherapy",
-      definition: "Whether radiation therapy was given, and when.",
-      cases: cases.map((c) => decodeRadiotherapy(c)),
-    },
-    {
-      label: "Systemic therapy",
-      definition:
-        "Chemotherapy drug (first regimen), number of cycles, and timing.",
-      cases: cases.map((c) => decodeSystemic(c)),
-    },
-    {
-      label: "Targeted therapy",
-      definition: "Targeted or immunotherapy agents.",
-      cases: cases.map((c) => decodeTargeted(c)),
-    },
+    { label: t.tumourDirLabel, definition: t.tumourDirDef, cases: cases.map((c) => decodeTumorDirected(c, locale)) },
+    { label: t.surgeryLabel, definition: t.surgeryDef, cases: cases.map((c) => decodeSurgery(c, locale)) },
+    { label: t.rtLabel, definition: t.rtDef, cases: cases.map((c) => decodeRadiotherapy(c, locale)) },
+    { label: t.systLabel, definition: t.systDef, cases: cases.map((c) => decodeSystemic(c, locale)) },
+    { label: t.targetLabel, definition: t.targetDef, cases: cases.map((c) => decodeTargeted(c, locale)) },
   ];
 
   const visibleOutcomeRows = outcomeRows.filter(rowHasAnyData);
   const visibleTreatmentRows = treatmentRows.filter(rowHasAnyData);
-
   const colSpan = cases.length + 2;
 
   return (
@@ -260,14 +288,13 @@ export function SideBySideView({
       <div className="flex-1 min-w-0 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            {cases.length} {CASE_LABEL}
-            {cases.length !== 1 ? "s" : ""}
+            {cases.length} {t.caseLabel}
+            {cases.length !== 1 ? t.casePlural : ""}
             <span className="ml-1.5 normal-case">
-              · {sharedKeys.length} of {baselineKeys.length} baseline features
-              shared
+              · {t.sharedOf(sharedKeys.length, baselineKeys.length)}
             </span>
           </p>
-          <FilterToggle value={filterMode} onChange={setFilterMode} />
+          <FilterToggle value={filterMode} onChange={setFilterMode} locale={locale} />
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-border/50 bg-card shadow-sm">
@@ -275,10 +302,10 @@ export function SideBySideView({
             <thead className="bg-muted/40">
               <tr>
                 <th className="sticky left-0 z-[1] bg-muted/40 text-left px-3 py-3 text-[10px] uppercase tracking-wide text-muted-foreground font-semibold border-b border-border/60 min-w-[200px]">
-                  Feature
+                  {t.feature}
                 </th>
                 <th className="text-left px-3 py-3 border-b border-border/60 border-l border-border/30 min-w-[120px] bg-emerald-50/40 dark:bg-emerald-950/15">
-                  <ColumnHeader label="This patient" accent />
+                  <ColumnHeader label={t.thisPatient} accent />
                 </th>
                 {cases.map((c, i) => (
                   <th
@@ -286,7 +313,7 @@ export function SideBySideView({
                     className="text-left px-3 py-3 border-b border-border/60 border-l border-border/30 min-w-[160px]"
                   >
                     <ColumnHeader
-                      label={`${CASE_LABEL} ${i + 1}`}
+                      label={`${t.caseLabel} ${i + 1}`}
                       similarity={getSimilarity(c)}
                       clusterSize={isPrototype ? getClusterSize(c) : null}
                       riskScore={isPrototype ? getRiskScore(c) : null}
@@ -300,8 +327,8 @@ export function SideBySideView({
 
             {visibleOutcomeRows.length > 0 && (
               <ComposedSection
-                title="Outcome"
-                subtitle="What happened to similar patients"
+                title={t.outcome}
+                subtitle={t.outcomeDesc}
                 colSpan={colSpan}
                 rows={visibleOutcomeRows}
               />
@@ -309,8 +336,8 @@ export function SideBySideView({
 
             {visibleTreatmentRows.length > 0 && (
               <ComposedSection
-                title="Treatment received"
-                subtitle="Therapies the similar patients underwent"
+                title={t.treatment}
+                subtitle={t.treatmentDesc}
                 colSpan={colSpan}
                 rows={visibleTreatmentRows}
               />
@@ -325,6 +352,8 @@ export function SideBySideView({
               cases={cases}
               glossary={glossary}
               differingKeys={differingKeys}
+              locale={locale}
+              t={t}
             />
           </table>
         </div>
@@ -332,19 +361,16 @@ export function SideBySideView({
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
           <span>
             <span className="inline-block w-3 h-3 rounded-sm bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800/40 mr-1.5 align-middle" />
-            Values matching the current patient.
+            {t.legendMatch}
           </span>
           <span>
             <span className="inline-block w-3 h-3 rounded-sm bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800/40 mr-1.5 align-middle" />
-            Values differing from the current patient.
+            {t.legendDiffer}
           </span>
-          <span>
-            Outcomes and treatments for "This patient" are withheld — the
-            model's prediction is what's being evaluated.
-          </span>
+          <span>{t.legendWithheld}</span>
         </div>
       </div>
-      <Sidebar method={method} isPrototype={isPrototype} />
+      <Sidebar method={method} isPrototype={isPrototype} locale={locale} />
     </div>
   );
 }
@@ -352,19 +378,22 @@ export function SideBySideView({
 function FilterToggle({
   value,
   onChange,
+  locale = "en",
 }: {
   value: FilterMode;
   onChange: (v: FilterMode) => void;
+  locale?: string;
 }) {
+  const t = SBS_T[locale as keyof typeof SBS_T] ?? SBS_T.en;
   const options: { key: FilterMode; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "shared", label: "Shared" },
-    { key: "differing", label: "Differing" },
+    { key: "all", label: t.filterAll },
+    { key: "shared", label: t.filterShared },
+    { key: "differing", label: t.filterDiffering },
   ];
   return (
     <div
       role="radiogroup"
-      aria-label="Feature filter"
+      aria-label={locale === "nl" ? "Kenmerkfilter" : "Feature filter"}
       className="inline-flex rounded-md border border-border/60 overflow-hidden text-[10px]"
     >
       {options.map((opt) => {
@@ -390,9 +419,9 @@ function FilterToggle({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Composed section (outcome / treatment)
-// ---------------------------------------------------------------------------
+/* ------------------------------------------------------------------ */
+/*  Composed section (outcome / treatment)                             */
+/* ------------------------------------------------------------------ */
 
 type ComposedRow = {
   label: string;
@@ -451,9 +480,7 @@ function ComposedSection({
             {row.cases.map((d, i) => (
               <td
                 key={i}
-                className={`px-3 py-2 align-top text-[12px] border-l border-border/30 border-b border-border/30 ${toneCellClass(
-                  d.tone,
-                )}`}
+                className={`px-3 py-2 align-top text-[12px] border-l border-border/30 border-b border-border/30 ${toneCellClass(d.tone)}`}
               >
                 <DecodedCell decoded={d} />
               </td>
@@ -497,6 +524,8 @@ function toneCellClass(tone?: Tone): string {
   }
 }
 
+type TDict = (typeof SBS_T)[keyof typeof SBS_T];
+
 function GroupedBaselineSection({
   colSpan,
   groups,
@@ -506,6 +535,8 @@ function GroupedBaselineSection({
   cases,
   glossary,
   differingKeys,
+  locale = "en",
+  t,
 }: {
   colSpan: number;
   groups: { heading: string | null; keys: string[] }[];
@@ -515,6 +546,8 @@ function GroupedBaselineSection({
   cases: CaseRecord[];
   glossary?: Record<string, GlossaryEntry>;
   differingKeys: Set<string>;
+  locale?: string;
+  t: TDict;
 }) {
   let runningRowIdx = 0;
   return (
@@ -524,9 +557,9 @@ function GroupedBaselineSection({
           colSpan={colSpan}
           className="sticky left-0 z-[1] px-3 py-2 bg-slate-100/60 dark:bg-slate-900/40 text-[10px] uppercase tracking-wider font-semibold text-foreground border-b border-border/60 border-t border-border/60"
         >
-          Clinical baseline
+          {t.baseline}
           <span className="ml-2 text-muted-foreground font-normal normal-case text-[10px]">
-            Pre-treatment features used to compute similarity
+            {t.baselineDesc}
           </span>
         </td>
       </tr>
@@ -546,6 +579,7 @@ function GroupedBaselineSection({
             cases={cases}
             glossary={glossary}
             differingKeys={differingKeys}
+            locale={locale}
           />
         );
       })}
@@ -556,9 +590,7 @@ function GroupedBaselineSection({
             colSpan={colSpan}
             className="text-center text-sm text-muted-foreground py-6"
           >
-            {hasAnyBaseline
-              ? "No matching baseline features for this filter."
-              : "No baseline features available."}
+            {hasAnyBaseline ? t.noFilter : t.noBaseline}
           </td>
         </tr>
       )}
@@ -574,6 +606,7 @@ function GroupRows({
   cases,
   glossary,
   differingKeys,
+  locale = "en",
 }: {
   heading: string | null;
   rows: { key: string; globalIdx: number }[];
@@ -582,6 +615,7 @@ function GroupRows({
   cases: CaseRecord[];
   glossary?: Record<string, GlossaryEntry>;
   differingKeys: Set<string>;
+  locale?: string;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -621,7 +655,7 @@ function GroupRows({
               )}
             </th>
             <td className="px-3 py-2 align-top text-[12px] text-foreground border-l border-border/30 border-b border-border/30 font-medium bg-emerald-50/30 dark:bg-emerald-950/10">
-              {decodeFeatureValue(key, qv)}
+              {decodeFeatureValue(key, qv, locale)}
             </td>
             {cases.map((c, i) => {
               const v = c[key];
@@ -635,7 +669,7 @@ function GroupRows({
                       : "bg-emerald-50/40 text-emerald-900 dark:bg-emerald-950/15 dark:text-emerald-200"
                   }`}
                 >
-                  {decodeFeatureValue(key, v)}
+                  {decodeFeatureValue(key, v, locale)}
                 </td>
               );
             })}

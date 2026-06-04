@@ -19,6 +19,7 @@ export type CounterfactualViewProps = {
     string,
     { content: Record<string, number>; metadata: Record<string, unknown> }
   >
+  locale: string
 }
 
 export type CardEntry = {

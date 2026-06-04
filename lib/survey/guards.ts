@@ -7,7 +7,7 @@ export async function redirectIfCompleted(code: string): Promise<void> {
     where: { accessCode: code },
     include: { sessions: { orderBy: { startedAt: "desc" }, take: 1 } },
   });
-  if (!participant) return; // unknown code → let the page's own notFound() handle it
+  if (!participant) return;
   const session = participant.sessions[0];
   if (session && session.status === "COMPLETED") {
     redirect(`/survey/${code}/complete`);
@@ -43,8 +43,10 @@ export type Summary = {
 
 function pickText(
   translations: { localeId: string; text: string }[],
+  locale: string,
 ): string {
   return (
+    translations.find((t) => t.localeId === locale)?.text ??
     translations.find((t) => t.localeId === "en")?.text ??
     translations[0]?.text ??
     "—"
@@ -53,8 +55,10 @@ function pickText(
 
 function pickLabel(
   translations: { localeId: string; label: string }[],
+  locale: string,
 ): string {
   return (
+    translations.find((t) => t.localeId === locale)?.label ??
     translations.find((t) => t.localeId === "en")?.label ??
     translations[0]?.label ??
     "—"
@@ -63,8 +67,10 @@ function pickLabel(
 
 function pickSurveyTitle(
   translations: { localeId: string; title: string }[],
+  locale: string,
 ): string {
   return (
+    translations.find((t) => t.localeId === locale)?.title ??
     translations.find((t) => t.localeId === "en")?.title ??
     translations[0]?.title ??
     "Survey"
@@ -73,15 +79,20 @@ function pickSurveyTitle(
 
 function pickSurveyDescription(
   translations: { localeId: string; description: string | null }[],
+  locale: string,
 ): string | null {
   return (
+    translations.find((t) => t.localeId === locale)?.description ??
     translations.find((t) => t.localeId === "en")?.description ??
     translations[0]?.description ??
     null
   );
 }
 
-export async function loadSummary(code: string): Promise<Summary | null> {
+export async function loadSummary(
+  code: string,
+  locale: string = "en",
+): Promise<Summary | null> {
   const participant = await prisma.participant.findUnique({
     where: { accessCode: code },
     include: {
@@ -122,7 +133,7 @@ export async function loadSummary(code: string): Promise<Summary | null> {
   const answerLabelById = new Map<string, string>();
   for (const q of session.survey.questions) {
     for (const a of q.answers) {
-      answerLabelById.set(a.id, pickLabel(a.translations));
+      answerLabelById.set(a.id, pickLabel(a.translations, locale));
     }
   }
 
@@ -136,14 +147,14 @@ export async function loadSummary(code: string): Promise<Summary | null> {
         : null;
     return {
       questionId: r.questionId,
-      questionText: q ? pickText(q.translations) : "Unknown question",
+      questionText: q ? pickText(q.translations, locale) : "—",
       questionType: q?.type ?? "?",
       flowTag,
       displayOrder: q?.displayOrder ?? 9999,
       model: (r.patient?.modelType ?? null) as "rsf" | "condor" | null,
       modality: r.modality,
       answerLabels: r.selectedAnswers.map((sa) =>
-        pickLabel(sa.answer.translations),
+        pickLabel(sa.answer.translations, locale),
       ),
       openText: r.openText,
       rankingLabels,
@@ -173,8 +184,8 @@ export async function loadSummary(code: string): Promise<Summary | null> {
     accessCode: participant.accessCode,
     completedAt: session.completedAt?.toISOString() ?? null,
     startedAt: session.startedAt.toISOString(),
-    surveyTitle: pickSurveyTitle(session.survey.translations),
-    surveyDescription: pickSurveyDescription(session.survey.translations),
+    surveyTitle: pickSurveyTitle(session.survey.translations, locale),
+    surveyDescription: pickSurveyDescription(session.survey.translations, locale),
     totalAnswers: answers.length,
     vignetteCount: session.sessionPatients.length,
     modalityOrder,

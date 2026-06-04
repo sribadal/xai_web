@@ -9,6 +9,7 @@ type TooltipInputProps = {
 }
 
 type Props = TooltipInputProps & {
+  locale: string
   glossary?: Record<string, GlossaryEntry>
   featureValues?: Record<string, number | string | null>
 }
@@ -18,6 +19,7 @@ export function ContributionTooltip({
   payload,
   glossary,
   featureValues,
+  locale,
 }: Props) {
   if (!active || !payload?.length) return null
   const row = payload[0].payload
@@ -42,6 +44,7 @@ export function ContributionTooltip({
         rawKey={row.rawKey}
         glossary={glossary}
         featureValues={featureValues}
+        locale={locale}
       />
     </div>
   )

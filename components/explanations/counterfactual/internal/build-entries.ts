@@ -1,19 +1,9 @@
-import { getActionability } from "@/lib/feature-actionability"
-import type { GlossaryEntry } from "@/app/admin/patients/actions"
-import {
-  buildLabel,
-  coerceScalar,
-  formatValue,
-  valuesEqual,
-} from "./labels"
-import { detectImplausibility } from "./plausibility"
-import type {
-  CardEntry,
-  ChangedFeature,
-  EntryPair,
-  ModelType,
-} from "./types"
-import { decodeFeatureValue } from "@/lib/feature-value-encoder"
+import { getActionability } from "@/lib/feature-actionability";
+import type { GlossaryEntry } from "@/app/admin/patients/actions";
+import { buildLabel, coerceScalar, formatValue, valuesEqual } from "./labels";
+import { detectImplausibility } from "./plausibility";
+import type { CardEntry, ChangedFeature, EntryPair, ModelType } from "./types";
+import { decodeFeatureValue } from "@/lib/feature-value-encoder";
 
 /**
  * Glossary valueLabels take priority (locale-specific), then fall back
@@ -23,13 +13,14 @@ function resolveDisplay(
   rawKey: string,
   value: unknown,
   valueLabels?: Record<string, string>,
+  locale: string = "en",
 ): string {
-  if (value === null || value === undefined) return "—"
+  if (value === null || value === undefined) return "—";
   if (valueLabels) {
-    const label = valueLabels[String(value)]
-    if (label) return label
+    const label = valueLabels[String(value)];
+    if (label) return label;
   }
-  return decodeFeatureValue(rawKey, value)
+  return decodeFeatureValue(rawKey, value, locale);
 }
 
 function pickValue(
@@ -38,21 +29,22 @@ function pickValue(
   fallbackRaw: Record<string, unknown> | undefined,
   fallback: Record<string, unknown>,
 ): unknown {
-  if (rawSource && rawKey in rawSource) return rawSource[rawKey]
-  if (fallbackRaw && rawKey in fallbackRaw) return fallbackRaw[rawKey]
-  return fallback[rawKey]
+  if (rawSource && rawKey in rawSource) return rawSource[rawKey];
+  if (fallbackRaw && rawKey in fallbackRaw) return fallbackRaw[rawKey];
+  return fallback[rawKey];
 }
 
 export type BuildEntriesArgs = {
-  content: Record<string, number>
-  originalFeatures: Record<string, unknown>
-  originalFeaturesRaw: Record<string, unknown> | undefined
-  rawQuery: Record<string, unknown> | undefined
-  rawCf: Record<string, unknown> | undefined
-  cfRow: Record<string, unknown> | undefined
-  modelType: ModelType
-  glossary?: Record<string, GlossaryEntry>
-}
+  content: Record<string, number>;
+  originalFeatures: Record<string, unknown>;
+  originalFeaturesRaw: Record<string, unknown> | undefined;
+  rawQuery: Record<string, unknown> | undefined;
+  rawCf: Record<string, unknown> | undefined;
+  cfRow: Record<string, unknown> | undefined;
+  modelType: ModelType;
+  glossary?: Record<string, GlossaryEntry>;
+  locale: string;
+};
 
 export function buildEntries({
   content,
@@ -63,30 +55,33 @@ export function buildEntries({
   cfRow,
   modelType,
   glossary,
+  locale,
 }: BuildEntriesArgs): {
-  pairs: EntryPair[]
-  changed: ChangedFeature[]
+  pairs: EntryPair[];
+  changed: ChangedFeature[];
 } {
-  const keys = new Set<string>()
-  for (const k of Object.keys(originalFeatures)) keys.add(k)
-  if (cfRow) for (const k of Object.keys(cfRow)) keys.add(k)
-  for (const k of Object.keys(content)) keys.add(k)
+  const keys = new Set<string>();
+  for (const k of Object.keys(originalFeatures)) keys.add(k);
+  if (cfRow) for (const k of Object.keys(cfRow)) keys.add(k);
+  for (const k of Object.keys(content)) keys.add(k);
 
-  const pairs: EntryPair[] = []
-  const changed: ChangedFeature[] = []
+  const pairs: EntryPair[] = [];
+  const changed: ChangedFeature[] = [];
 
   for (const rawKey of keys) {
     const { feature, label, definition, valueLabels } = buildLabel(
       rawKey,
       glossary,
-    )
-    const actionability = getActionability(rawKey)
+    );
+    const actionability = getActionability(rawKey);
 
     const originalRaw = coerceScalar(
       pickValue(rawKey, rawQuery, originalFeaturesRaw, originalFeatures),
-    )
-    const cfRaw = coerceScalar(pickValue(rawKey, rawCf, undefined, cfRow ?? {}))
-    const cfEffective = cfRaw === null ? originalRaw : cfRaw
+    );
+    const cfRaw = coerceScalar(
+      pickValue(rawKey, rawCf, undefined, cfRow ?? {}),
+    );
+    const cfEffective = cfRaw === null ? originalRaw : cfRaw;
 
     const original: CardEntry = {
       rawKey,
@@ -94,20 +89,20 @@ export function buildEntries({
       label,
       definition,
       actionability,
-      displayValue: resolveDisplay(rawKey, originalRaw, valueLabels),
+      displayValue: resolveDisplay(rawKey, originalRaw, valueLabels, locale),
       rawValue: originalRaw,
-    }
+    };
     const counterfactual: CardEntry = {
       rawKey,
       feature,
       label,
       definition,
       actionability,
-      displayValue: resolveDisplay(rawKey, cfEffective, valueLabels),
+      displayValue: resolveDisplay(rawKey, cfEffective, valueLabels, locale),
       rawValue: cfEffective,
-    }
+    };
 
-    pairs.push({ original, counterfactual })
+    pairs.push({ original, counterfactual });
 
     if (!valuesEqual(originalRaw, cfEffective)) {
       const { implausible, reason } = detectImplausibility(
@@ -115,21 +110,27 @@ export function buildEntries({
         originalRaw,
         cfEffective,
         modelType,
-      )
+        locale,
+      );
       changed.push({
         rawKey,
         feature,
         label,
         definition,
         actionability,
-        originalDisplay: resolveDisplay(rawKey, originalRaw, valueLabels),
-        cfDisplay: resolveDisplay(rawKey, cfEffective, valueLabels),
+        originalDisplay: resolveDisplay(
+          rawKey,
+          originalRaw,
+          valueLabels,
+          locale,
+        ),
+        cfDisplay: resolveDisplay(rawKey, cfEffective, valueLabels, locale),
         originalRaw,
         cfRaw: cfEffective,
         implausible,
         implausibleReason: reason,
-      })
+      });
     }
   }
-  return { pairs, changed }
+  return { pairs, changed };
 }

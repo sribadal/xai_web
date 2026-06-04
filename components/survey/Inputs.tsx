@@ -112,17 +112,20 @@ export function OpenQuestion({
   value,
   onChange,
   placeholder,
+  locale = "en",
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  locale?: string;
 }) {
+  const defaultPlaceholder = locale === "nl" ? "Typ uw antwoord…" : "Type your answer…";
   return (
     <textarea
       className="open-input"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder ?? "Type your answer…"}
+      placeholder={placeholder ?? defaultPlaceholder}
     />
   );
 }

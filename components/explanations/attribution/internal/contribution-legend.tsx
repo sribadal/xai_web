@@ -5,14 +5,15 @@ import type { DirectionLabels } from "../../shared/colors"
 type Props = {
   hasNegative: boolean
   direction: DirectionLabels
+  locale: string
 }
 
-export function ContributionLegend({ hasNegative, direction }: Props) {
+export function ContributionLegend({ hasNegative, direction, locale }: Props) {
   if (!hasNegative) {
     return (
       <LegendSwatch
         color={COLOR_NEUTRAL}
-        label="Higher = more important"
+        label={locale === 'nl'? 'Hoger = meer belangrijk' : "Higher = more important"}
       />
     )
   }

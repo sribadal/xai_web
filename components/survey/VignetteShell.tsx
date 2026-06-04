@@ -13,10 +13,53 @@ import { ExpandableCard } from "./ExpandableCard";
 import { filterInternalLimeKeys } from "@/lib/feature-filters";
 import type { GlossaryEntry } from "@/lib/survey/data.server";
 
+const SHELL_T = {
+  en: {
+    method: (i: number) => `Method ${i}`,
+    survivalModel: "Survival model",
+    qolModel: "Quality-of-life model",
+    explanationSuffix: "explanation",
+    transitionNote:
+      "You will now see the same patient, this time analyzed by a model that predicts quality of life instead of survival.",
+    multiMethodNote:
+      "You will see two variants below. Please review both before answering the questions on the right.",
+    patientSummary: "Patient summary",
+    modelOutput: "Model output",
+    predictionWindow: "Prediction window",
+    noMethods:
+      "No methods configured for this modality. Set them in the survey edit form.",
+    noData: "No data found.",
+    noDataHorizon: (label: string) => `No data found at ${label}.`,
+    errorPrefix: "Could not generate this explanation:",
+    thinkAloud:
+      "Please keep talking as you review this screen: what you notice first, what you understand, and what feels unclear.",
+  },
+  nl: {
+    method: (i: number) => `Methode ${i}`,
+    survivalModel: "Overlevingsmodel",
+    qolModel: "Kwaliteit-van-levenmodel",
+    explanationSuffix: "uitleg",
+    transitionNote:
+      "U ziet nu dezelfde patiënt, dit keer geanalyseerd door een model dat kwaliteit van leven voorspelt in plaats van overleving.",
+    multiMethodNote:
+      "U ziet hieronder twee varianten. Bekijk beide voordat u de vragen aan de rechterkant beantwoordt.",
+    patientSummary: "Patiëntsamenvatting",
+    modelOutput: "Modeluitkomst",
+    predictionWindow: "Voorspellingsperiode",
+    noMethods:
+      "Geen methoden geconfigureerd voor deze modaliteit. Stel ze in via het bewerkingsformulier.",
+    noData: "Geen gegevens gevonden.",
+    noDataHorizon: (label: string) => `Geen gegevens gevonden bij ${label}.`,
+    errorPrefix: "Kon deze uitleg niet genereren:",
+    thinkAloud:
+      "Blijf alstublieft hardop denken terwijl u dit scherm bekijkt: wat u als eerste opvalt, wat u begrijpt en wat onduidelijk is.",
+  },
+} as const;
+
 const MODALITY_INTRO: Record<string, { en: string; nl: string }> = {
   ATTRIBUTION_rsf: {
     en: "This explanation highlights which patient characteristics had the most influence on the survival prediction. Green bars (left) indicate features that lower mortality risk; red bars (right) indicate features that increase it. Longer bars have a stronger effect.",
-    nl: "Deze uitleg laat zien welke patiëntkenmerken de meeste invloed hadden op de overlevingsvoorspelling. Groene balken (rechts) duiden op kenmerken die het sterfterisico verlagen; rode balken (links) op kenmerken die het verhogen. Langere balken hebben een sterker effect.",
+    nl: "Deze uitleg laat zien welke patiëntkenmerken de meeste invloed hadden op de overlevingsvoorspelling. Groene balken (links) duiden op kenmerken die het sterfterisico verlagen; rode balken (rechts) op kenmerken die het verhogen. Langere balken hebben een sterker effect.",
   },
   ATTRIBUTION_condor: {
     en: "This explanation highlights which patient characteristics had the most influence on the quality-of-life prediction. Green bars (right) indicate features that improve predicted quality of life; red bars (left) indicate features that reduce it. Longer bars have a stronger effect.",
@@ -36,18 +79,18 @@ const MODALITY_INTRO: Record<string, { en: string; nl: string }> = {
   },
 };
 
-const RSF_HORIZON_OPTIONS: { value: string; label: string }[] = [
-  { value: "3_months", label: "3-month risk" },
-  { value: "6_months", label: "6-month risk" },
-  { value: "12_months", label: "12-month risk" },
+const RSF_HORIZON_OPTIONS: { value: string; label: { en: string; nl: string } }[] = [
+  { value: "3_months", label: { en: "3-month risk", nl: "3-maanden risico" } },
+  { value: "6_months", label: { en: "6-month risk", nl: "6-maanden risico" } },
+  { value: "12_months", label: { en: "12-month risk", nl: "12-maanden risico" } },
 ];
 
-const CONDOR_HORIZON_OPTIONS: { value: string; label: string }[] = [
-  { value: "1_month", label: "1-month QoL" },
-  { value: "3_months", label: "3-month QoL" },
-  { value: "6_months", label: "6-month QoL" },
-  { value: "9_months", label: "9-month QoL" },
-  { value: "12_months", label: "12-month QoL" },
+const CONDOR_HORIZON_OPTIONS: { value: string; label: { en: string; nl: string } }[] = [
+  { value: "1_month", label: { en: "1-month QoL", nl: "1-maand KvL" } },
+  { value: "3_months", label: { en: "3-month QoL", nl: "3-maanden KvL" } },
+  { value: "6_months", label: { en: "6-month QoL", nl: "6-maanden KvL" } },
+  { value: "9_months", label: { en: "9-month QoL", nl: "9-maanden KvL" } },
+  { value: "12_months", label: { en: "12-month QoL", nl: "12-maanden KvL" } },
 ];
 
 const HORIZON_INDEPENDENT_MODALITIES = new Set<Modality>(["CASE_BASED"]);
@@ -116,7 +159,8 @@ export function VignetteShell({
 }) {
   const isRsf = modelType === "rsf";
   const isCondor = modelType === "condor";
-  const methodLabel = `Method ${modalityIndex + 1}`;
+  const t = SHELL_T[locale] ?? SHELL_T.en;
+  const methodLabel = t.method(modalityIndex + 1);
 
   const modalityIntro =
     MODALITY_INTRO[`${modality}_${modelType}`]?.[locale] ??
@@ -132,10 +176,6 @@ export function VignetteShell({
     return [];
   }, [isRsf, isCondor]);
 
-  // For horizon-independent modalities (case-based), derive available
-  // horizons from the prediction object instead of from explanation rows
-  // — case-based explanations don't carry per-horizon timeHorizon fields,
-  // but the query patient's prediction still has horizon-specific values.
   const availableHorizons = useMemo(() => {
     if (horizonOptions.length === 0) return new Set<string>();
     if (modalityIsHorizonIndependent) {
@@ -159,12 +199,7 @@ export function VignetteShell({
       if (e.timeHorizon && e.timeHorizon !== "") found.add(e.timeHorizon);
     }
     return found;
-  }, [
-    modalityIsHorizonIndependent,
-    horizonOptions,
-    explanations,
-    patient.prediction,
-  ]);
+  }, [modalityIsHorizonIndependent, horizonOptions, explanations, patient.prediction]);
 
   const horizonChips = useMemo(
     () => horizonOptions.filter((o) => availableHorizons.has(o.value)),
@@ -181,9 +216,6 @@ export function VignetteShell({
     return "";
   });
 
-  // For horizon-independent modalities, show all explanations regardless
-  // of the selected horizon — the explanation data doesn't vary by
-  // horizon (e.g. case-based retrieves the same similar patients).
   const visibleExplanations = useMemo(() => {
     if (modalityIsHorizonIndependent) return explanations;
     if (!useHorizons) return explanations;
@@ -202,20 +234,9 @@ export function VignetteShell({
       if (exp.error) continue;
       const horizonKey = exp.timeHorizon ?? "";
       if (!horizonKey) continue;
-      if (
-        !exp.content ||
-        typeof exp.content !== "object" ||
-        Array.isArray(exp.content)
-      ) {
-        continue;
-      }
+      if (!exp.content || typeof exp.content !== "object" || Array.isArray(exp.content)) continue;
       if (!indexed.has(exp.method)) indexed.set(exp.method, new Map());
-      indexed
-        .get(exp.method)!
-        .set(
-          horizonKey,
-          filterInternalLimeKeys(exp.content as Record<string, number>),
-        );
+      indexed.get(exp.method)!.set(horizonKey, filterInternalLimeKeys(exp.content as Record<string, number>));
     }
 
     const orderedKeys = horizonOptions.map((o) => o.value);
@@ -233,10 +254,11 @@ export function VignetteShell({
     <div className="survey-stage-wide">
       <div style={{ marginBottom: "var(--survey-space-7)" }}>
         <span className="modality-chip">
-          {methodLabel} · {isRsf ? "Survival model" : "Quality-of-life model"}
+          {methodLabel} · {isRsf ? t.survivalModel : t.qolModel}
         </span>
         <h2 style={{ marginTop: "var(--survey-space-4)" }}>
-          <span className="display-italic">{methodLabel}</span> explanation
+          <span className="display-italic">{methodLabel}</span>{" "}
+          {t.explanationSuffix}
         </h2>
         {patientIndex === 1 && (
           <p
@@ -251,8 +273,7 @@ export function VignetteShell({
               color: "var(--survey-ink, #1f1f1f)",
             }}
           >
-            You will now see the same patient, this time analyzed by a model
-            that predicts quality of life instead of survival.
+            {t.transitionNote}
           </p>
         )}
         {modalityIntro && (
@@ -272,13 +293,9 @@ export function VignetteShell({
         {methods.length > 1 && (
           <p
             className="survey-prose"
-            style={{
-              marginTop: "var(--survey-space-3)",
-              fontSize: "0.9rem",
-            }}
+            style={{ marginTop: "var(--survey-space-3)", fontSize: "0.9rem" }}
           >
-            You will see two variants below. Please review both before answering
-            the questions on the right.
+            {t.multiMethodNote}
           </p>
         )}
       </div>
@@ -286,17 +303,18 @@ export function VignetteShell({
       <div className="vignette-grid">
         <div className="vignette-left">
           <div className="survey-card survey-card--dummy">
-            <div className="survey-card-label">Patient summary</div>
-            <PatientSummaryCard patient={patient} />
+            <div className="survey-card-label">{t.patientSummary}</div>
+            <PatientSummaryCard patient={patient} locale={locale} />
           </div>
 
           <div className="survey-card survey-card--dummy">
-            <div className="survey-card-label">Model output</div>
+            <div className="survey-card-label">{t.modelOutput}</div>
             <OutcomeTrajectoryCard
               prediction={patient.prediction}
               modelType={modelType}
               activeHorizon={timeHorizon}
               onHorizonChange={setTimeHorizon}
+              locale={locale}
             />
           </div>
 
@@ -317,11 +335,11 @@ export function VignetteShell({
                   color: "var(--survey-muted, #666)",
                 }}
               >
-                Prediction window
+                {t.predictionWindow}
               </span>
               <div
                 role="tablist"
-                aria-label="Prediction time horizon"
+                aria-label={t.predictionWindow}
                 style={{
                   display: "inline-flex",
                   border: "1px solid var(--survey-border, #d4d4d4)",
@@ -358,7 +376,7 @@ export function VignetteShell({
                         fontFamily: "inherit",
                       }}
                     >
-                      {opt.label}
+                      {opt.label[locale]}
                     </button>
                   );
                 })}
@@ -367,47 +385,32 @@ export function VignetteShell({
           )}
 
           {methods.length === 0 ? (
-            <div
-              className="survey-card survey-card--dummy"
-              style={{ minHeight: 320 }}
-            >
+            <div className="survey-card survey-card--dummy" style={{ minHeight: 320 }}>
               <div className="survey-card-label">{methodLabel}</div>
-              <div>
-                No methods configured for this modality. Set them in the survey
-                edit form.
-              </div>
+              <div>{t.noMethods}</div>
             </div>
           ) : (
             methods.map((method) => {
               const exp = byMethod.get(method);
               if (!exp) {
                 return (
-                  <div
-                    key={method}
-                    className="survey-card survey-card--dummy"
-                    style={{ minHeight: 200 }}
-                  >
+                  <div key={method} className="survey-card survey-card--dummy" style={{ minHeight: 200 }}>
                     <div className="survey-card-label">{methodLabel}</div>
                     <div>
                       {useHorizons
-                        ? `No data found at ${
-                            horizonChips.find((h) => h.value === timeHorizon)
-                              ?.label ?? timeHorizon
-                          }.`
-                        : "No data found."}
+                        ? t.noDataHorizon(
+                            horizonChips.find((h) => h.value === timeHorizon)?.label[locale] ?? timeHorizon,
+                          )
+                        : t.noData}
                     </div>
                   </div>
                 );
               }
               if (exp.error) {
                 return (
-                  <div
-                    key={method}
-                    className="survey-card survey-card--dummy"
-                    style={{ minHeight: 200 }}
-                  >
+                  <div key={method} className="survey-card survey-card--dummy" style={{ minHeight: 200 }}>
                     <div className="survey-card-label">{methodLabel}</div>
-                    <div>Could not generate this explanation: {exp.error}</div>
+                    <div>{t.errorPrefix} {exp.error}</div>
                   </div>
                 );
               }
@@ -418,9 +421,7 @@ export function VignetteShell({
                 exp.content &&
                 typeof exp.content === "object" &&
                 !Array.isArray(exp.content)
-                  ? filterInternalLimeKeys(
-                      exp.content as Record<string, number>,
-                    )
+                  ? filterInternalLimeKeys(exp.content as Record<string, number>)
                   : exp.content;
 
               return (
@@ -437,6 +438,7 @@ export function VignetteShell({
                     modelType={modelType}
                     timeHorizon={useHorizons ? timeHorizon : ""}
                     glossary={glossary}
+                    locale={locale}
                     horizonContents={horizonContentsByMethod.get(method)}
                   />
                 </ExpandableCard>
@@ -446,10 +448,7 @@ export function VignetteShell({
         </div>
 
         <div className="vignette-right">
-          <ThinkAloudHint>
-            Please keep talking as you review this screen: what you notice
-            first, what you understand, and what feels unclear.
-          </ThinkAloudHint>
+          <ThinkAloudHint>{t.thinkAloud}</ThinkAloudHint>
           {right}
         </div>
       </div>
@@ -466,6 +465,7 @@ function MethodExplanation({
   modelType,
   timeHorizon,
   glossary,
+  locale,
   horizonContents,
 }: {
   modality: Modality;
@@ -476,11 +476,12 @@ function MethodExplanation({
   modelType: string;
   timeHorizon: string;
   glossary?: Record<string, GlossaryEntry>;
+  locale: "en" | "nl";
   horizonContents?: Record<string, Record<string, number>>;
 }) {
   const common = {
     glossary: glossary ?? {},
-    locale: "en" as const,
+    locale,
   };
 
   switch (modality) {
@@ -488,16 +489,10 @@ function MethodExplanation({
       return (
         <AttributionView
           method={method}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content={content as any}
           modelType={modelType as "rsf" | "condor"}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           prediction={patient.prediction as any}
           timeHorizon={timeHorizon}
-          // Prefer featuresRaw (clinical-only) when present, matching
-          // the admin PatientDetail call site. Falling back to features
-          // would re-introduce the cat_* dummies via the value lookup.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           featureValues={
             {
               ...(patient.features as Record<string, unknown>),
@@ -506,13 +501,6 @@ function MethodExplanation({
           }
           showTopNSelector
           horizonContents={horizonContents}
-          // The vignette controls horizon selection at the parent level
-          // (the OutcomeTrajectoryCard pills + the "Prediction window"
-          // tab strip directly under it), so suppress the inner
-          // HorizonChips row to avoid a third duplicate control. The
-          // prop is honored end-to-end:
-          // AttributionView → LimeView → ContributionView (which
-          // already gates on showHorizonChips).
           showHorizonChips={false}
           {...common}
         />
@@ -521,15 +509,10 @@ function MethodExplanation({
       return (
         <CaseBasedView
           method={method}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content={content as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           metadata={metadata as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           features={patient.features as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           featuresRaw={patient.featuresRaw as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           prediction={patient.prediction as any}
           timeHorizon={timeHorizon}
           {...common}
@@ -539,16 +522,11 @@ function MethodExplanation({
       return (
         <CounterfactualView
           method={method}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content={content as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           metadata={metadata as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           features={patient.features as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           featuresRaw={patient.featuresRaw as any}
           modelType={modelType as "rsf" | "condor"}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           prediction={patient.prediction as any}
           timeHorizon={timeHorizon}
           {...common}
@@ -558,9 +536,7 @@ function MethodExplanation({
       return (
         <RuleBasedView
           method={method}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content={content as any}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           featuresRaw={patient.featuresRaw as any}
           modelType={modelType as "rsf" | "condor"}
           {...common}

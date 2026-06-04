@@ -8,6 +8,7 @@ type Props = {
   description: string;
   children?: ReactNode;
   defaultOpen?: boolean;
+  locale: string;
 };
 
 export function MethodSidebar({
@@ -15,6 +16,7 @@ export function MethodSidebar({
   description,
   children,
   defaultOpen,
+  locale,
 }: Props) {
   const size = useChartSize();
   const initialOpen = defaultOpen ?? size === "large";
@@ -37,8 +39,24 @@ export function MethodSidebar({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          aria-label={open ? "Collapse method info" : "Expand method info"}
-          title={open ? "Collapse method info" : "Expand method info"}
+          aria-label={
+            open
+              ? locale === "nl"
+                ? "Zijbalk inklappen"
+                : "Collapse method info"
+              : locale === "nl"
+                ? "Zijbalk uitklappen"
+                : "Expand method info"
+          }
+          title={
+            open
+              ? locale === "nl"
+                ? "Zijbalk inklappen"
+                : "Collapse method info"
+              : locale === "nl"
+                ? "Zijbalk uitklappen"
+                : "Expand method info"
+          }
           className={
             "flex items-center justify-center w-6 h-6 rounded " +
             "text-muted-foreground hover:text-foreground hover:bg-muted " +
@@ -64,10 +82,7 @@ export function MethodSidebar({
 }
 
 function ChevronIcon({ direction }: { direction: "left" | "right" }) {
-  const d =
-    direction === "left"
-      ? "M15 18l-6-6 6-6"
-      : "M9 18l6-6-6-6";
+  const d = direction === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6";
   return (
     <svg
       width="14"

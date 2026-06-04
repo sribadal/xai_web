@@ -20,6 +20,7 @@ export interface RuleBasedMessages {
   narrative: {
     leadIn: string;
     and: string;
+    or: string;
     finalAnd: string;
     listSeparator: string;
     outcomeSuffix: (outcome: string) => string;
@@ -46,6 +47,7 @@ export interface RuleBasedMessages {
     firingRulesCount: (n: number) => string;
     showTechnical: string;
     showClinical: string;
+    showDefinition: string;
     prediction: string;
     keyFactors: string;
     contributingPatterns: string;
@@ -132,6 +134,7 @@ const en: RuleBasedMessages = {
   narrative: {
     leadIn: "The model predicts this outcome because the patient's ",
     and: " and ",
+    or: " or ",
     finalAnd: ", and ",
     listSeparator: ", ",
     outcomeSuffix: (outcome) =>
@@ -164,6 +167,7 @@ const en: RuleBasedMessages = {
     firingRulesCount: (n) => `${n} firing rule${n !== 1 ? "s" : ""}`,
     showTechnical: "Show technical notation",
     showClinical: "Show clinical summary",
+    showDefinition: "Definition",
     prediction: "Prediction",
     keyFactors: "Key clinical factors",
     contributingPatterns: "Contributing clinical patterns",
@@ -301,6 +305,7 @@ const nl: RuleBasedMessages = {
   narrative: {
     leadIn: "Het model voorspelt deze uitkomst omdat de ",
     and: " en ",
+    or: " of ",
     finalAnd: " en ",
     listSeparator: ", ",
     outcomeSuffix: (outcome) =>
@@ -333,6 +338,7 @@ const nl: RuleBasedMessages = {
     firingRulesCount: (n) => `${n} actieve regel${n !== 1 ? "s" : ""}`,
     showTechnical: "Technische notatie tonen",
     showClinical: "Klinische samenvatting tonen",
+    showDefinition: "Definitie",
     prediction: "Voorspelling",
     keyFactors: "Belangrijkste klinische factoren",
     contributingPatterns: "Bijdragende klinische patronen",

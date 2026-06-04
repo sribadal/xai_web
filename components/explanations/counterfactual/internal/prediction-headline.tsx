@@ -1,26 +1,62 @@
 import { SCALE_CONFIG, type Scale } from "./scale";
 
+const PRED_T = {
+  en: {
+    fallback: (n: number) =>
+      `If this patient looked like the counterfactual on the right — ` +
+      `${n} feature${n === 1 ? "" : "s"} different — the model would predict a different outcome.`,
+    main: (
+      n: number,
+      outcomeNoun: string,
+      dir: string,
+      from: string,
+      to: string,
+    ) =>
+      null, // built inline for JSX styling
+    features: (n: number) => `${n} feature${n === 1 ? "" : "s"}`,
+    changed: "changed as shown, the predicted",
+    would: "would",
+    from: "from",
+    to: "to",
+    rise: "rise",
+    fall: "fall",
+    with: "With",
+  },
+  nl: {
+    fallback: (n: number) =>
+      `Als deze patiënt eruitzag als het alternatieve profiel rechts — ` +
+      `${n} kenmerk${n === 1 ? "" : "en"} anders — zou het model een andere uitkomst voorspellen.`,
+    features: (n: number) => `${n} kenmerk${n === 1 ? "" : "en"}`,
+    changed: "gewijzigd zoals getoond, zou de voorspelde",
+    would: "zou",
+    from: "van",
+    to: "naar",
+    rise: "stijgen",
+    fall: "dalen",
+    with: "Met",
+  },
+} as const;
+
 export function PredictionHeadline({
   scale,
   originalPrediction,
   cfPrediction,
   changeCount,
+  locale = "en",
 }: {
   scale: Scale;
   originalPrediction: number | null;
   cfPrediction: number | null;
   changeCount: number;
+  locale?: string;
 }) {
+  const t = PRED_T[locale as keyof typeof PRED_T] ?? PRED_T.en;
   const cfg = SCALE_CONFIG[scale];
 
   if (originalPrediction === null || cfPrediction === null) {
     return (
       <p className="text-sm text-foreground leading-relaxed">
-        If this patient looked like the counterfactual on the right —{" "}
-        <span className="font-medium">
-          {changeCount} feature{changeCount === 1 ? "" : "s"} different
-        </span>{" "}
-        — the model would predict a different outcome.
+        {t.fallback(changeCount)}
       </p>
     );
   }
@@ -28,20 +64,18 @@ export function PredictionHeadline({
   const improved = cfg.lowerIsBetter
     ? cfPrediction < originalPrediction
     : cfPrediction > originalPrediction;
-  const directionWord = cfPrediction > originalPrediction ? "rise" : "fall";
+  const directionWord = cfPrediction > originalPrediction ? t.rise : t.fall;
 
   return (
     <p className="text-sm text-foreground leading-relaxed">
-      With{" "}
-      <span className="font-medium">
-        {changeCount} feature{changeCount === 1 ? "" : "s"}
-      </span>{" "}
-      changed as shown, the predicted {cfg.outcomeNoun} would {directionWord}{" "}
-      from{" "}
+      {t.with}{" "}
+      <span className="font-medium">{t.features(changeCount)}</span>{" "}
+      {t.changed} {cfg.outcomeNoun} {directionWord}{" "}
+      {t.from}{" "}
       <span className="font-mono font-medium">
         {cfg.formatPrediction(originalPrediction)}
       </span>{" "}
-      to{" "}
+      {t.to}{" "}
       <span
         className={`font-mono font-medium ${
           improved

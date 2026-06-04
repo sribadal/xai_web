@@ -17,6 +17,7 @@ import { formatTooltipValue, makeTickFormatter } from "../../shared/formatters"
 import type { AttributionRow } from "./types"
 
 type Props = {
+  locale: string
   rows: AttributionRow[]
   glossary?: Record<string, GlossaryEntry>
   featureValues?: Record<string, number | string | null>
@@ -26,7 +27,7 @@ const CHART_HEIGHT = 320
 const Y_AXIS_WIDTH = 70
 const X_AXIS_HEIGHT = 60
 
-export function ImportanceChart({ rows, glossary, featureValues }: Props) {
+export function ImportanceChart({ rows, glossary, featureValues, locale }: Props) {
   const maxAbs = rows.reduce((m, r) => Math.max(m, Math.abs(r.value)), 0)
   const tickFormatter = makeTickFormatter(maxAbs, false)
 
@@ -60,6 +61,7 @@ export function ImportanceChart({ rows, glossary, featureValues }: Props) {
               glossary={glossary}
               featureValues={featureValues}
               maxAbs={maxAbs}
+              locale={locale}
             />
           }
           cursor={{ fill: "rgba(0, 0, 0, 0.04)" }}
@@ -81,12 +83,14 @@ function ImportanceTooltip({
   glossary,
   featureValues,
   maxAbs,
+  locale,
 }: {
   active?: boolean
   payload?: Array<{ payload: AttributionRow }>
   glossary?: Record<string, GlossaryEntry>
   featureValues?: Record<string, number | string | null>
   maxAbs: number
+  locale: string
 }) {
   if (!active || !payload?.length) return null
   const row = payload[0].payload
@@ -101,6 +105,7 @@ function ImportanceTooltip({
         rawKey={row.rawKey}
         glossary={glossary}
         featureValues={featureValues}
+        locale={locale}
       />
     </div>
   )

@@ -26,6 +26,7 @@ type Props = {
   goodSign: GoodSign;
   glossary?: Record<string, GlossaryEntry>;
   featureValues?: Record<string, number | string | null>;
+  locale: string;
 };
 
 const MIN_CHART_HEIGHT = 260;
@@ -57,6 +58,7 @@ export function ContributionChart({
   goodSign,
   glossary,
   featureValues,
+  locale,
 }: Props) {
   const size = useChartSize();
   const isLarge = size === "large";
@@ -118,6 +120,7 @@ export function ContributionChart({
             <ContributionTooltip
               glossary={glossary}
               featureValues={featureValues}
+              locale={locale}
             />
           }
           cursor={{ fill: "rgba(0, 0, 0, 0.04)" }}

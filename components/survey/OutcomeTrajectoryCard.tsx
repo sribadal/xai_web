@@ -49,9 +49,9 @@ const CONDOR_HORIZONS: { value: string; label: string; month: number }[] = [
 // ---------------------------------------------------------------------------
 
 const AXIS_SEGMENTS = [
-  { endDay: 365, scale: 1.0 },   // 0–12m: full scale
-  { endDay: 730, scale: 0.5 },   // 12–24m: half scale
-  { endDay: 1095, scale: 0.3 },  // 24–36m: 30% scale
+  { endDay: 365, scale: 1.0 }, // 0–12m: full scale
+  { endDay: 730, scale: 0.5 }, // 12–24m: half scale
+  { endDay: 1095, scale: 0.3 }, // 24–36m: 30% scale
 ];
 
 const BREAK_GAP = 25; // chart-space gap for the axis break
@@ -97,6 +97,7 @@ type Props = {
   modelType: string;
   activeHorizon?: string;
   onHorizonChange?: (h: string) => void;
+  locale: string;
 };
 
 export function OutcomeTrajectoryCard({
@@ -104,11 +105,13 @@ export function OutcomeTrajectoryCard({
   modelType,
   activeHorizon,
   onHorizonChange,
+  locale,
 }: Props) {
   const summary = generateModelOutputSummary(
     prediction,
     modelType,
     activeHorizon,
+    locale,
   );
 
   return (

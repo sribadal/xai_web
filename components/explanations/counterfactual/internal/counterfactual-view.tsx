@@ -1,27 +1,51 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
+import { useMemo, useState } from "react";
 import {
   filterInternalCaseRecord,
   filterInternalFeatures,
-} from "@/lib/feature-filters"
-import { buildEntries } from "./build-entries"
-import { ExactValuesTable } from "./exact-values-table"
-import { HORIZON_CUMULATIVE, sortHorizons } from "./horizons"
-import { valuesEqual } from "./labels"
-import { PredictionHeadline } from "./prediction-headline"
-import {
-  extractPatientPrediction,
-  resolveScale,
-} from "./scale"
-import { Sidebar } from "./sidebar"
+} from "@/lib/feature-filters";
+import { buildEntries } from "./build-entries";
+import { ExactValuesTable } from "./exact-values-table";
+import { HORIZON_CUMULATIVE, sortHorizons } from "./horizons";
+import { valuesEqual } from "./labels";
+import { PredictionHeadline } from "./prediction-headline";
+import { extractPatientPrediction, resolveScale } from "./scale";
+import { Sidebar } from "./sidebar";
 import type {
   ChangedFeature,
   CounterfactualViewProps,
   EntryPair,
-} from "./types"
+} from "./types";
 
-type ViewTab = "changed" | "all"
+type ViewTab = "changed" | "all";
+
+const CF_T = {
+  en: {
+    noData: "No data for this patient",
+    feature: "Feature",
+    thisPatient: "This patient",
+    altProfile: "Alternative profile",
+    noFeatures: "No features to show.",
+    implausible: "⚠ implausible",
+    legendChange: "Suggested change",
+    legendImplausible: "Clinically implausible change",
+    changed: (n: number) => `Changed (${n})`,
+    all: (n: number) => `All (${n})`,
+  },
+  nl: {
+    noData: "Geen gegevens voor deze patiënt",
+    feature: "Kenmerk",
+    thisPatient: "Deze patiënt",
+    altProfile: "Alternatief profiel",
+    noFeatures: "Geen kenmerken om te tonen.",
+    implausible: "⚠ onwaarschijnlijk",
+    legendChange: "Voorgestelde wijziging",
+    legendImplausible: "Klinisch onwaarschijnlijke wijziging",
+    changed: (n: number) => `Gewijzigd (${n})`,
+    all: (n: number) => `Alle (${n})`,
+  },
+} as const;
 
 export function CounterfactualView({
   content,
@@ -34,74 +58,76 @@ export function CounterfactualView({
   timeHorizon,
   glossary,
   horizonContents,
+  locale = "en",
 }: CounterfactualViewProps) {
-  const [viewTab, setViewTab] = useState<ViewTab>("changed")
+  const t = CF_T[locale as keyof typeof CF_T] ?? CF_T.en;
+  const [viewTab, setViewTab] = useState<ViewTab>("changed");
 
   const availableHorizons = useMemo(
     () => (horizonContents ? sortHorizons(Object.keys(horizonContents)) : []),
     [horizonContents],
-  )
+  );
 
-  const initialHorizon = timeHorizon ?? HORIZON_CUMULATIVE
-  const [activeHorizon, setActiveHorizon] = useState<string>(initialHorizon)
+  const initialHorizon = timeHorizon ?? HORIZON_CUMULATIVE;
+  const [activeHorizon, setActiveHorizon] = useState<string>(initialHorizon);
 
   const effectiveHorizon =
     availableHorizons.length > 0 && !availableHorizons.includes(activeHorizon)
       ? availableHorizons[0]
-      : activeHorizon
+      : activeHorizon;
 
-  const horizonEntry = horizonContents?.[effectiveHorizon]
-  const effectiveContent = horizonEntry?.content ?? content
-  const effectiveMetadata = horizonEntry?.metadata ?? metadata
+  const horizonEntry = horizonContents?.[effectiveHorizon];
+  const effectiveContent = horizonEntry?.content ?? content;
+  const effectiveMetadata = horizonEntry?.metadata ?? metadata;
 
   const filteredContent = useMemo(
     () => filterInternalFeatures(effectiveContent),
     [effectiveContent],
-  )
+  );
   const filteredFeatures = useMemo(
     () => filterInternalCaseRecord(features as Record<string, unknown>),
     [features],
-  )
+  );
   const filteredFeaturesRaw = useMemo(
     () =>
       featuresRaw
         ? filterInternalCaseRecord(featuresRaw as Record<string, unknown>)
         : undefined,
     [featuresRaw],
-  )
+  );
 
   const rawQueryRaw = effectiveMetadata?.raw_query as
     | Record<string, unknown>
     | undefined
-    | null
+    | null;
   const rawCfRaw = effectiveMetadata?.raw_cf as
     | Record<string, unknown>
     | undefined
-    | null
+    | null;
   const rawQuery = rawQueryRaw
     ? filterInternalCaseRecord(rawQueryRaw)
-    : undefined
-  const rawCf = rawCfRaw ? filterInternalCaseRecord(rawCfRaw) : undefined
+    : undefined;
+  const rawCf = rawCfRaw ? filterInternalCaseRecord(rawCfRaw) : undefined;
 
   const cfDf = effectiveMetadata?.counterfactual_df as
     | Record<string, unknown>[]
     | undefined
-    | null
+    | null;
   const cfRow = cfDf?.[0]
     ? filterInternalCaseRecord(cfDf[0] as Record<string, unknown>)
-    : undefined
+    : undefined;
 
-  const scale = resolveScale(modelType, effectiveHorizon)
+  const scale = resolveScale(modelType, effectiveHorizon);
 
   const originalPrediction: number | null =
     effectiveMetadata?.original_prediction != null
       ? Number(effectiveMetadata.original_prediction)
-      : extractPatientPrediction(prediction, scale, effectiveHorizon)
+      : extractPatientPrediction(prediction, scale, effectiveHorizon);
 
   const cfPrediction: number | null =
     effectiveMetadata?.cf_prediction != null
       ? Number(effectiveMetadata.cf_prediction)
-      : null
+      : null;
 
   const { pairs, changed } = useMemo(
     () =>
@@ -114,6 +140,7 @@ export function CounterfactualView({
         cfRow,
         modelType,
         glossary,
+        locale,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -123,14 +150,15 @@ export function CounterfactualView({
       effectiveMetadata,
       modelType,
       glossary,
+      locale,
     ],
-  )
+  );
 
   const changedMap = useMemo(() => {
-    const m = new Map<string, ChangedFeature>()
-    for (const c of changed) m.set(c.rawKey, c)
-    return m
-  }, [changed])
+    const m = new Map<string, ChangedFeature>();
+    for (const c of changed) m.set(c.rawKey, c);
+    return m;
+  }, [changed]);
 
   const changedPairs = useMemo(
     () =>
@@ -138,15 +166,15 @@ export function CounterfactualView({
         (p) => !valuesEqual(p.original.rawValue, p.counterfactual.rawValue),
       ),
     [pairs],
-  )
+  );
 
-  const visiblePairs = viewTab === "changed" ? changedPairs : pairs
-  const implausibleCount = changed.filter((c) => c.implausible).length
+  const visiblePairs = viewTab === "changed" ? changedPairs : pairs;
+  const implausibleCount = changed.filter((c) => c.implausible).length;
 
   if (Object.keys(filteredContent).length === 0 && !cfRow) {
     return (
-      <p className="text-sm text-muted-foreground">No data for this patient</p>
-    )
+      <p className="text-sm text-muted-foreground">{t.noData}</p>
+    );
   }
 
   return (
@@ -157,6 +185,7 @@ export function CounterfactualView({
           originalPrediction={originalPrediction}
           cfPrediction={cfPrediction}
           changeCount={changed.length}
+          locale={locale}
         />
 
         <div className="flex items-center justify-end">
@@ -165,6 +194,7 @@ export function CounterfactualView({
             onChange={setViewTab}
             changedCount={changedPairs.length}
             allCount={pairs.length}
+            locale={locale}
           />
         </div>
 
@@ -173,16 +203,16 @@ export function CounterfactualView({
             <thead className="bg-muted/40">
               <tr>
                 <th className="sticky left-0 z-[1] bg-muted/40 text-left px-3 py-3 text-[10px] uppercase tracking-wide text-muted-foreground font-semibold border-b border-border/60 min-w-[200px]">
-                  Feature
+                  {t.feature}
                 </th>
                 <th className="text-left px-3 py-3 border-b border-border/60 border-l border-border/30 min-w-[140px] bg-emerald-50/40 dark:bg-emerald-950/15">
                   <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                    This patient
+                    {t.thisPatient}
                   </span>
                 </th>
                 <th className="text-left px-3 py-3 border-b border-border/60 border-l border-border/30 min-w-[160px] bg-sky-50/40 dark:bg-sky-950/15">
                   <span className="text-xs font-semibold text-sky-700 dark:text-sky-400">
-                    Alternative profile
+                    {t.altProfile}
                   </span>
                 </th>
               </tr>
@@ -194,19 +224,19 @@ export function CounterfactualView({
                     colSpan={3}
                     className="text-center text-sm text-muted-foreground py-6"
                   >
-                    No features to show.
+                    {t.noFeatures}
                   </td>
                 </tr>
               ) : (
                 visiblePairs.map((pair, rowIdx) => {
-                  const orig = pair.original
-                  const cf = pair.counterfactual
-                  const isChanged = !valuesEqual(orig.rawValue, cf.rawValue)
-                  const changedFeature = changedMap.get(orig.rawKey)
-                  const implausible = !!changedFeature?.implausible
-                  const implausibleReason = changedFeature?.implausibleReason
-                  const isEven = rowIdx % 2 === 0
-                  const rowBgClass = isEven ? "bg-background" : "bg-muted/10"
+                  const orig = pair.original;
+                  const cf = pair.counterfactual;
+                  const isChanged = !valuesEqual(orig.rawValue, cf.rawValue);
+                  const changedFeature = changedMap.get(orig.rawKey);
+                  const implausible = !!changedFeature?.implausible;
+                  const implausibleReason = changedFeature?.implausibleReason;
+                  const isEven = rowIdx % 2 === 0;
+                  const rowBgClass = isEven ? "bg-background" : "bg-muted/10";
 
                   return (
                     <tr
@@ -252,7 +282,7 @@ export function CounterfactualView({
                           </span>
                           {isChanged && implausible && (
                             <span className="inline-block text-[9px] uppercase tracking-wide px-1 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-sans">
-                              ⚠ implausible
+                              {t.implausible}
                             </span>
                           )}
                         </div>
@@ -263,7 +293,7 @@ export function CounterfactualView({
                         )}
                       </td>
                     </tr>
-                  )
+                  );
                 })
               )}
             </tbody>
@@ -273,15 +303,15 @@ export function CounterfactualView({
         <p className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-3">
           <span className="inline-flex items-center">
             <span className="inline-block w-3 h-3 rounded-sm bg-sky-50 border border-sky-200 dark:bg-sky-950/30 dark:border-sky-800/40 mr-1.5" />
-            Suggested change
+            {t.legendChange}
           </span>
           <span className="inline-flex items-center">
             <span className="inline-block w-3 h-3 rounded-sm bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800/40 mr-1.5" />
-            Clinically implausible change
+            {t.legendImplausible}
           </span>
         </p>
 
-        <ExactValuesTable changed={changed} />
+        <ExactValuesTable changed={changed} locale={locale} />
       </div>
 
       <Sidebar
@@ -292,9 +322,10 @@ export function CounterfactualView({
         horizons={availableHorizons}
         activeHorizon={effectiveHorizon}
         onSelectHorizon={setActiveHorizon}
+        locale={locale}
       />
     </div>
-  )
+  );
 }
 
 function ViewToggle({
@@ -302,24 +333,27 @@ function ViewToggle({
   onChange,
   changedCount,
   allCount,
+  locale = "en",
 }: {
-  tab: ViewTab
-  onChange: (t: ViewTab) => void
-  changedCount: number
-  allCount: number
+  tab: ViewTab;
+  onChange: (t: ViewTab) => void;
+  changedCount: number;
+  allCount: number;
+  locale?: string;
 }) {
+  const t = CF_T[locale as keyof typeof CF_T] ?? CF_T.en;
   const options: { key: ViewTab; label: string }[] = [
-    { key: "changed", label: `Changed (${changedCount})` },
-    { key: "all", label: `All (${allCount})` },
-  ]
+    { key: "changed", label: t.changed(changedCount) },
+    { key: "all", label: t.all(allCount) },
+  ];
   return (
     <div
       role="radiogroup"
-      aria-label="Feature view"
+      aria-label={locale === "nl" ? "Kenmerkweergave" : "Feature view"}
       className="inline-flex rounded-md border border-border/60 overflow-hidden text-[10px]"
     >
       {options.map((opt) => {
-        const active = tab === opt.key
+        const active = tab === opt.key;
         return (
           <button
             key={opt.key}
@@ -335,8 +369,8 @@ function ViewToggle({
           >
             {opt.label}
           </button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

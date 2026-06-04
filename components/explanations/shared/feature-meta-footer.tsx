@@ -2,7 +2,6 @@ import { parseFeatureKey } from "@/lib/parse-feature-key"
 import type { GlossaryEntry } from "@/app/admin/patients/actions"
 import { decodeFeatureValue } from "@/lib/feature-value-encoder"
 
-/** ConDOR uses human-readable feature names; map back to patient record keys. */
 const FEATURE_ALIASES: Record<string, string> = {
   "time since surgery": "ts_surg",
   "time since systemic therapy": "ts_syst",
@@ -18,16 +17,17 @@ type Props = {
   rawKey: string
   glossary?: Record<string, GlossaryEntry>
   featureValues?: Record<string, number | string | null>
+  locale: string
 }
 
-export function FeatureMetaFooter({ rawKey, glossary, featureValues }: Props) {
+export function FeatureMetaFooter({ rawKey, glossary, featureValues, locale }: Props) {
   const parsed = parseFeatureKey(rawKey)
   const entry = glossary?.[parsed.feature]
   const nkrKey = FEATURE_ALIASES[parsed.feature] ?? parsed.feature
   const patientValue =
     featureValues?.[parsed.feature] ??
     featureValues?.[FEATURE_ALIASES[parsed.feature] ?? ""]
-  const displayValue = resolvePatientValue(patientValue, entry, nkrKey)
+  const displayValue = resolvePatientValue(patientValue, entry, nkrKey, locale)
   const definition = entry?.definition
 
   if (displayValue === null && !definition) return null
@@ -52,6 +52,7 @@ function resolvePatientValue(
   value: number | string | null | undefined,
   entry: GlossaryEntry | undefined,
   featureKey: string,
+  locale: string,
 ): string | null {
   if (value === null || value === undefined) return null
   // Glossary value map takes priority (locale-specific labels)
@@ -60,5 +61,5 @@ function resolvePatientValue(
     entry?.value_labels?.[String(value)]
   if (label) return label
   // Fall back to the comprehensive decoder (sentinels, units, binary vars, TNM)
-  return decodeFeatureValue(featureKey, value)
+  return decodeFeatureValue(featureKey, value, locale)
 }
