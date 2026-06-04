@@ -21,27 +21,29 @@ export default async function Page({
       title="Thinking aloud"
     >
       <p>
-        For the rest of the study, we will ask you to think aloud as you
-        review each screen. Say what you are looking at, what you
-        understand, and what confuses you. There are no right or wrong
-        answers.
+        For the rest of the study, we will ask you to think aloud as you review
+        each screen. Say what you are looking at, what you understand, and what
+        confuses you. There are no right or wrong answers.
       </p>
 
-      <div
-        className="survey-card survey-card--dummy"
-        style={{ marginTop: "var(--survey-space-6)", minHeight: 180 }}
+      <video
+        controls
+        playsInline
+        preload="metadata"
+        style={{
+          width: "100%",
+          borderRadius: 8,
+          marginTop: "var(--survey-space-4)",
+        }}
       >
-        <div className="survey-card-label">Practice example</div>
-        <div>
-          A neutral example will render here. Try describing what you see
-          out loud before continuing.
-        </div>
-      </div>
+        <source src="/practice.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
 
       <div style={{ marginTop: "var(--survey-space-6)" }}>
         <ThinkAloudHint>
-          If you are unsure what to say, describe what you notice first and
-          what you think it means.
+          If you are unsure what to say, describe what you notice first and what
+          you think it means.
         </ThinkAloudHint>
       </div>
     </StaticStep>
