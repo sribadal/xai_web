@@ -8,7 +8,6 @@ import {
   Line,
   LineChart,
   ReferenceLine,
-  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -29,10 +28,10 @@ const CONDOR_ACCENT_BG = "#E1F5EE";
 const GRID_STROKE = "rgba(127,127,127,0.15)";
 const TICK_FILL = "#888780";
 
-const RSF_HORIZONS: { value: string; label: string; days: number }[] = [
-  { value: "3_months", label: "3 mo", days: 90 },
-  { value: "6_months", label: "6 mo", days: 180 },
-  { value: "12_months", label: "12 mo", days: 365 },
+const RSF_HORIZONS: { value: string; label: string; month: number }[] = [
+  { value: "3_months", label: "3 mo", month: 3 },
+  { value: "6_months", label: "6 mo", month: 6 },
+  { value: "12_months", label: "12 mo", month: 12 },
 ];
 
 const CONDOR_HORIZONS: { value: string; label: string; month: number }[] = [
@@ -43,61 +42,12 @@ const CONDOR_HORIZONS: { value: string; label: string; month: number }[] = [
   { value: "12_months", label: "12 mo", month: 12 },
 ];
 
-// ---------------------------------------------------------------------------
-// Compressed x-axis: year 1 gets the most space, years 2–3 are compressed,
-// and the long-term endpoint sits in a tiny break zone at the right edge.
-// ---------------------------------------------------------------------------
-
-const AXIS_SEGMENTS = [
-  { endDay: 365, scale: 1.0 }, // 0–12m: full scale
-  { endDay: 730, scale: 0.5 }, // 12–24m: half scale
-  { endDay: 1095, scale: 0.3 }, // 24–36m: 30% scale
-];
-
-const BREAK_GAP = 25; // chart-space gap for the axis break
-
-function daysToPos(days: number): number {
-  let pos = 0;
-  let prev = 0;
-  for (const seg of AXIS_SEGMENTS) {
-    if (days <= seg.endDay) {
-      return pos + (days - prev) * seg.scale;
-    }
-    pos += (seg.endDay - prev) * seg.scale;
-    prev = seg.endDay;
-  }
-  // Beyond 36m — in the break zone
-  return pos + BREAK_GAP;
-}
-
-// Pre-compute key positions
-const POS_3M = daysToPos(90);
-const POS_6M = daysToPos(180);
-const POS_12M = daysToPos(365);
-const POS_18M = daysToPos(548);
-const POS_24M = daysToPos(730);
-const POS_36M = daysToPos(1095);
-const POS_ENDPOINT = POS_36M + BREAK_GAP;
-const POS_BREAK_START = POS_36M + 5;
-const POS_CHART_MAX = POS_ENDPOINT + 15;
-
-// Tick definitions: position → label
-const RSF_TICKS_BASE = [
-  { pos: 0, label: "0" },
-  { pos: POS_3M, label: "3m" },
-  { pos: POS_6M, label: "6m" },
-  { pos: POS_12M, label: "12m" },
-  { pos: POS_18M, label: "18m" },
-  { pos: POS_24M, label: "24m" },
-  { pos: POS_36M, label: "36m" },
-];
-
 type Props = {
   prediction: unknown;
   modelType: string;
   activeHorizon?: string;
   onHorizonChange?: (h: string) => void;
-  locale: string;
+  locale?: string;
 };
 
 export function OutcomeTrajectoryCard({
@@ -105,7 +55,7 @@ export function OutcomeTrajectoryCard({
   modelType,
   activeHorizon,
   onHorizonChange,
-  locale,
+  locale = "en",
 }: Props) {
   const summary = generateModelOutputSummary(
     prediction,
@@ -121,12 +71,14 @@ export function OutcomeTrajectoryCard({
           prediction={prediction}
           activeHorizon={activeHorizon}
           onHorizonChange={onHorizonChange}
+          locale={locale}
         />
       ) : modelType === "condor" ? (
         <CondorQolTrajectory
           prediction={prediction}
           activeHorizon={activeHorizon}
           onHorizonChange={onHorizonChange}
+          locale={locale}
         />
       ) : null}
 
@@ -144,14 +96,20 @@ export function OutcomeTrajectoryCard({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  RSF — linear 0–36 month axis                                      */
+/* ------------------------------------------------------------------ */
+
 function RsfSurvivalTrajectory({
   prediction,
   activeHorizon,
   onHorizonChange,
+  locale = "en",
 }: {
   prediction: unknown;
   activeHorizon?: string;
   onHorizonChange?: (h: string) => void;
+  locale?: string;
 }) {
   const p = prediction as Record<string, unknown> | null;
   const curveArr = p?.survival_curve as
@@ -161,63 +119,44 @@ function RsfSurvivalTrajectory({
   const times = curve?.times ?? [];
   const values = curve?.values ?? [];
 
-  const { data, endpointYears, hasEndpoint, chartMax, ticks, tickMap } =
-    useMemo(() => {
-      if (times.length === 0) {
-        return {
-          data: [],
-          endpointYears: 0,
-          hasEndpoint: false,
-          chartMax: POS_36M,
-          ticks: RSF_TICKS_BASE.map((t) => t.pos),
-          tickMap: new Map(RSF_TICKS_BASE.map((t) => [t.pos, t.label])),
-        };
-      }
+  const data = useMemo(() => {
+    if (times.length === 0) return [];
 
-      // Build main data up to 3 years, mapped to compressed positions
-      const pts: { pos: number; survival: number }[] = [];
-      for (let i = 0; i < times.length; i++) {
-        if (times[i] > 1095) break;
-        pts.push({
-          pos: daysToPos(times[i]),
-          survival: values[i] * 100,
-        });
-      }
+    const pts: { month: number; survival: number }[] = [];
+    for (let i = 0; i < times.length; i++) {
+      const month = times[i] / DAYS_PER_MONTH;
+      if (month > 36) break;
+      pts.push({ month, survival: values[i] * 100 });
+    }
 
-      // Check if curve extends beyond 3 years
-      const lastDay = times[times.length - 1];
-      const lastVal = values[values.length - 1] * 100;
-      const hasLongTerm = lastDay > 1095;
-      const years = Math.round(lastDay / 365);
-
-      if (hasLongTerm) {
-        // Extend the 36m value to the break start, then add endpoint
-        if (pts.length > 0) {
-          const val36 = pts[pts.length - 1].survival;
-          pts.push({ pos: POS_BREAK_START, survival: val36 });
+    // Ensure we have a value at 36 months
+    if (pts.length > 0) {
+      const lastPt = pts[pts.length - 1];
+      if (lastPt.month < 36) {
+        // Try to interpolate from data beyond 36m
+        for (let i = 0; i < times.length; i++) {
+          const month = times[i] / DAYS_PER_MONTH;
+          if (month >= 36) {
+            pts.push({ month: 36, survival: values[i] * 100 });
+            break;
+          }
         }
-        pts.push({ pos: POS_ENDPOINT, survival: lastVal });
+        // If still no 36m point, extend last known value
+        if (pts[pts.length - 1].month < 36) {
+          pts.push({ month: 36, survival: lastPt.survival });
+        }
       }
+    }
 
-      const allTicks = [...RSF_TICKS_BASE];
-      if (hasLongTerm) {
-        allTicks.push({ pos: POS_ENDPOINT, label: `⋯ ${years}y` });
-      }
-
-      return {
-        data: pts,
-        endpointYears: years,
-        hasEndpoint: hasLongTerm,
-        chartMax: hasLongTerm ? POS_CHART_MAX : POS_36M + 10,
-        ticks: allTicks.map((t) => t.pos),
-        tickMap: new Map(allTicks.map((t) => [t.pos, t.label])),
-      };
-    }, [times, values]);
+    return pts;
+  }, [times, values]);
 
   if (data.length === 0) {
     return (
       <p className="survey-prose" style={{ fontSize: "0.85rem" }}>
-        Survival curve unavailable.
+        {locale === "nl"
+          ? "Overlevingscurve niet beschikbaar."
+          : "Survival curve unavailable."}
       </p>
     );
   }
@@ -226,7 +165,7 @@ function RsfSurvivalTrajectory({
   const yMin = Math.max(0, Math.floor(minSurvival / 10) * 10 - 10);
 
   const activeOpt = RSF_HORIZONS.find((h) => h.value === activeHorizon);
-  const activePos = activeOpt ? daysToPos(activeOpt.days) : undefined;
+  const activeMonth = activeOpt?.month;
 
   const horizonPills = RSF_HORIZONS.map((h) => {
     const survProb = p?.[`survival_prob_${h.value}`];
@@ -241,21 +180,26 @@ function RsfSurvivalTrajectory({
     };
   });
 
+  const xTicks = [0, 3, 6, 12, 18, 24, 36];
+  const yLabel = locale === "nl" ? "Overleving (%)" : "Survival (%)";
+  const xLabel =
+    locale === "nl" ? "Tijd sinds diagnose" : "Time since diagnosis";
+
   return (
     <>
       <div style={{ width: "100%", height: 180, marginTop: 4 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={data}
-            margin={{ top: 8, right: 12, bottom: 4, left: 0 }}
+            margin={{ top: 8, right: 12, bottom: 20, left: 0 }}
           >
             <CartesianGrid stroke={GRID_STROKE} vertical={false} />
             <XAxis
               type="number"
-              dataKey="pos"
-              domain={[0, chartMax]}
-              ticks={ticks}
-              tickFormatter={(pos) => tickMap.get(pos) ?? ""}
+              dataKey="month"
+              domain={[0, 36]}
+              ticks={xTicks}
+              tickFormatter={(m) => (m === 0 ? "0" : `${m}m`)}
               tick={{ fontSize: 10, fill: TICK_FILL }}
               stroke={GRID_STROKE}
             />
@@ -267,17 +211,6 @@ function RsfSurvivalTrajectory({
               stroke={GRID_STROKE}
               width={36}
             />
-
-            {hasEndpoint && (
-              <ReferenceArea
-                x1={POS_BREAK_START}
-                x2={POS_CHART_MAX}
-                fill="var(--survey-card-alt-bg, #f5f5f4)"
-                fillOpacity={0.6}
-                strokeOpacity={0}
-              />
-            )}
-
             <Area
               type="monotone"
               dataKey="survival"
@@ -289,9 +222,9 @@ function RsfSurvivalTrajectory({
               dot={false}
               activeDot={false}
             />
-            {activePos !== undefined && (
+            {activeMonth !== undefined && (
               <ReferenceLine
-                x={activePos}
+                x={activeMonth}
                 stroke={RSF_COLOR_ACCENT}
                 strokeDasharray="3 4"
                 strokeWidth={1}
@@ -299,17 +232,18 @@ function RsfSurvivalTrajectory({
             )}
             <Tooltip
               cursor={false}
-              labelFormatter={(pos) => {
-                const num = Number(pos);
-                if (num >= POS_ENDPOINT && hasEndpoint)
-                  return `~${endpointYears} years`;
-                // Reverse-map position to approximate months
-                // (not exact, but close enough for a tooltip)
-                const label = tickMap.get(num);
-                if (label) return label;
-                return "";
+              labelFormatter={(m) => {
+                const num = Number(m);
+                if (num === 0)
+                  return locale === "nl" ? "Diagnose" : "Diagnosis";
+                return locale === "nl"
+                  ? `${num.toFixed(0)} maanden`
+                  : `${num.toFixed(0)} months`;
               }}
-              formatter={(v) => [`${Number(v).toFixed(1)}%`, "Survival"]}
+              formatter={(v) => [
+                `${Number(v).toFixed(1)}%`,
+                locale === "nl" ? "Overleving" : "Survival",
+              ]}
               contentStyle={{ fontSize: 11 }}
             />
           </AreaChart>
@@ -327,14 +261,20 @@ function RsfSurvivalTrajectory({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  ConDOR — 0–12 month axis                                          */
+/* ------------------------------------------------------------------ */
+
 function CondorQolTrajectory({
   prediction,
   activeHorizon,
   onHorizonChange,
+  locale = "en",
 }: {
   prediction: unknown;
   activeHorizon?: string;
   onHorizonChange?: (h: string) => void;
+  locale?: string;
 }) {
   const p = prediction as Record<string, unknown> | null;
   const baseline = p?.qol_baseline;
@@ -349,7 +289,9 @@ function CondorQolTrajectory({
   if (points.length === 0) {
     return (
       <p className="survey-prose" style={{ fontSize: "0.85rem" }}>
-        Quality-of-life trajectory unavailable.
+        {locale === "nl"
+          ? "Kwaliteit-van-leventraject niet beschikbaar."
+          : "Quality-of-life trajectory unavailable."}
       </p>
     );
   }
@@ -372,13 +314,17 @@ function CondorQolTrajectory({
     };
   });
 
+  const yLabel = locale === "nl" ? "Kwaliteit van leven" : "Quality of life";
+  const xLabel =
+    locale === "nl" ? "Tijd sinds diagnose" : "Time since diagnosis";
+
   return (
     <>
       <div style={{ width: "100%", height: 180, marginTop: 4 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={points}
-            margin={{ top: 8, right: 12, bottom: 4, left: 0 }}
+            margin={{ top: 8, right: 12, bottom: 20, left: 0 }}
           >
             <CartesianGrid stroke={GRID_STROKE} vertical={false} />
             <XAxis
@@ -389,6 +335,12 @@ function CondorQolTrajectory({
               tickFormatter={(m) => (m === 0 ? "base" : `${m}m`)}
               tick={{ fontSize: 10, fill: TICK_FILL }}
               stroke={GRID_STROKE}
+              label={{
+                value: xLabel,
+                position: "bottom",
+                offset: 4,
+                style: { fontSize: 10, fill: TICK_FILL },
+              }}
             />
             <YAxis
               type="number"
@@ -396,6 +348,13 @@ function CondorQolTrajectory({
               tick={{ fontSize: 10, fill: TICK_FILL }}
               stroke={GRID_STROKE}
               width={32}
+              label={{
+                value: yLabel,
+                angle: -90,
+                position: "insideLeft",
+                offset: 8,
+                style: { fontSize: 10, fill: TICK_FILL, textAnchor: "middle" },
+              }}
             />
             <Line
               type="linear"
@@ -420,10 +379,18 @@ function CondorQolTrajectory({
             )}
             <Tooltip
               cursor={false}
-              labelFormatter={(m) =>
-                m === 0 ? "Baseline" : `${m} month${m === 1 ? "" : "s"}`
-              }
-              formatter={(v) => [Number(v).toFixed(1), "QoL"]}
+              labelFormatter={(m) => {
+                const num = Number(m);
+                if (num === 0)
+                  return locale === "nl" ? "Basislijn" : "Baseline";
+                return locale === "nl"
+                  ? `${num} maand${num === 1 ? "" : "en"}`
+                  : `${num} month${num === 1 ? "" : "s"}`;
+              }}
+              formatter={(v) => [
+                Number(v).toFixed(1),
+                locale === "nl" ? "KvL" : "QoL",
+              ]}
               contentStyle={{ fontSize: 11 }}
             />
           </LineChart>
@@ -440,6 +407,10 @@ function CondorQolTrajectory({
     </>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Shared horizon pills                                               */
+/* ------------------------------------------------------------------ */
 
 function HorizonPills({
   horizons,
