@@ -22,6 +22,12 @@ type ViewTab = "changed" | "all";
 
 const CF_T = {
   en: {
+    manyChanges: (changes: number, implausible: number) =>
+      implausible > 0
+        ? `The model needed ${changes} change${changes !== 1 ? "s" : ""} to reach a different outcome (${implausible} of which ${implausible === 1 ? "is" : "are"} clinically implausible).`
+        : `The model needed ${changes} change${changes !== 1 ? "s" : ""} to reach a different outcome.`,
+    fewChanges: (changes: number) =>
+      `The model needed only ${changes} plausible change${changes !== 1 ? "s" : ""} to reach a different outcome.`,
     noData: "No data for this patient",
     feature: "Feature",
     thisPatient: "This patient",
@@ -32,8 +38,18 @@ const CF_T = {
     legendImplausible: "Clinically implausible change",
     changed: (n: number) => `Changed (${n})`,
     all: (n: number) => `All (${n})`,
+    robustBanner: (changes: number, implausible: number) =>
+      `${changes} change${changes !== 1 ? "s" : ""} needed${implausible > 0 ? ` (${implausible} clinically implausible)` : ""} to alter the prediction — the prediction appears robust.`,
+    fragileBanner: (changes: number) =>
+      `Only ${changes} plausible change${changes !== 1 ? "s" : ""} would alter the prediction — the model may be less certain here.`,
   },
   nl: {
+    manyChanges: (changes: number, implausible: number) =>
+      implausible > 0
+        ? `Het model had ${changes} wijziging${changes !== 1 ? "en" : ""} nodig om tot een andere uitkomst te komen (${implausible} daarvan klinisch onwaarschijnlijk).`
+        : `Het model had ${changes} wijziging${changes !== 1 ? "en" : ""} nodig om tot een andere uitkomst te komen.`,
+    fewChanges: (changes: number) =>
+      `Het model had slechts ${changes} plausibele wijziging${changes !== 1 ? "en" : ""} nodig om tot een andere uitkomst te komen.`,
     noData: "Geen gegevens voor deze patiënt",
     feature: "Kenmerk",
     thisPatient: "Deze patiënt",
@@ -44,8 +60,14 @@ const CF_T = {
     legendImplausible: "Klinisch onwaarschijnlijke wijziging",
     changed: (n: number) => `Gewijzigd (${n})`,
     all: (n: number) => `Alle (${n})`,
+    robustBanner: (changes: number, implausible: number) =>
+      `${changes} wijziging${changes !== 1 ? "en" : ""} nodig${implausible > 0 ? ` (${implausible} klinisch onwaarschijnlijk)` : ""} om de voorspelling te veranderen — de voorspelling lijkt robuust.`,
+    fragileBanner: (changes: number) =>
+      `Slechts ${changes} plausibele wijziging${changes !== 1 ? "en" : ""} zou de voorspelling veranderen — het model is hier mogelijk minder zeker.`,
   },
 } as const;
+
+type CFTDict = (typeof CF_T)[keyof typeof CF_T];
 
 export function CounterfactualView({
   content,
@@ -172,9 +194,7 @@ export function CounterfactualView({
   const implausibleCount = changed.filter((c) => c.implausible).length;
 
   if (Object.keys(filteredContent).length === 0 && !cfRow) {
-    return (
-      <p className="text-sm text-muted-foreground">{t.noData}</p>
-    );
+    return <p className="text-sm text-muted-foreground">{t.noData}</p>;
   }
 
   return (
@@ -186,6 +206,12 @@ export function CounterfactualView({
           cfPrediction={cfPrediction}
           changeCount={changed.length}
           locale={locale}
+        />
+
+        <RobustnessBanner
+          changeCount={changed.length}
+          implausibleCount={implausibleCount}
+          t={t}
         />
 
         <div className="flex items-center justify-end">
@@ -324,6 +350,38 @@ export function CounterfactualView({
         onSelectHorizon={setActiveHorizon}
         locale={locale}
       />
+    </div>
+  );
+}
+
+function RobustnessBanner({
+  changeCount,
+  implausibleCount,
+  t,
+}: {
+  changeCount: number;
+  implausibleCount: number;
+  t: CFTDict;
+}) {
+  if (changeCount === 0) return null;
+
+  const plausibleCount = changeCount - implausibleCount;
+  const many = changeCount >= 3 || implausibleCount > 0;
+
+  const text = many
+    ? t.manyChanges(changeCount, implausibleCount)
+    : t.fewChanges(plausibleCount);
+
+  const border = many
+    ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-800/40 dark:bg-emerald-950/20"
+    : "border-amber-200 bg-amber-50/40 dark:border-amber-800/40 dark:bg-amber-950/20";
+  const textColor = many
+    ? "text-emerald-700 dark:text-emerald-400"
+    : "text-amber-700 dark:text-amber-400";
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 ${border}`}>
+      <p className={`text-[11px] font-medium ${textColor}`}>{text}</p>
     </div>
   );
 }

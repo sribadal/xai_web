@@ -46,6 +46,16 @@ const SBS_T = {
     filterAll: "All",
     filterShared: "Shared",
     filterDiffering: "Differing",
+    horizonLabel: (h: string) => {
+      const map: Record<string, string> = {
+        "1_month": "1 month",
+        "3_months": "3 months",
+        "6_months": "6 months",
+        "9_months": "9 months",
+        "12_months": "12 months",
+      };
+      return map[h] ?? h.replace(/_/g, " ");
+    },
     predOutcome: (h: string) => `Predicted outcome (${h})`,
     predOutcomeDef:
       "Model-predicted outcome for each similar patient at the selected time horizon.",
@@ -74,6 +84,25 @@ const SBS_T = {
       "Chemotherapy drug (first regimen), number of cycles, and timing.",
     targetLabel: "Targeted therapy",
     targetDef: "Targeted or immunotherapy agents.",
+    outcomeBanner: (survived: number, died: number, total: number, horizon: string) =>
+      `Of ${total} similar patient${total !== 1 ? "s" : ""}: ${survived} survived past ${horizon}, ${died} did not.`,
+    modelPredicts: (pct: string, horizon: string) =>
+      `Model predicts ${pct} survival at ${horizon}.`,
+    modelPredictsQol: (score: string, horizon: string) =>
+      `Model predicts ${score} quality of life at ${horizon}.`,
+    outcomesConsistent: "Similar patients' outcomes align with the prediction.",
+    outcomesBetter: "Similar patients fared better than the model predicts.",
+    outcomesWorse: "Similar patients fared worse than the model predicts.",
+    outcomesMixed: "Similar patients had mixed outcomes — prediction is less certain.",
+    qolBanner: (avg: string, n: number, horizon: string) =>
+      `${n} similar patient${n !== 1 ? "s" : ""} averaged ${avg} QoL at ${horizon}.`,
+    qolClose: "Similar patients scored close to the model's prediction.",
+    qolHigher: "Similar patients scored higher than the model predicts.",
+    qolLower: "Similar patients scored lower than the model predicts.",
+    strongMatch: "Strong match",
+    moderateMatch: "Moderate match",
+    weakMatch: "Weak match",
+    baselineQol: "baseline QoL",
   },
   nl: {
     caseLabel: "Vergelijkbare patiënt",
@@ -100,6 +129,16 @@ const SBS_T = {
     filterAll: "Alle",
     filterShared: "Gedeeld",
     filterDiffering: "Afwijkend",
+    horizonLabel: (h: string) => {
+      const map: Record<string, string> = {
+        "1_month": "1 maand",
+        "3_months": "3 maanden",
+        "6_months": "6 maanden",
+        "9_months": "9 maanden",
+        "12_months": "12 maanden",
+      };
+      return map[h] ?? h.replace(/_/g, " ");
+    },
     predOutcome: (h: string) => `Voorspelde uitkomst (${h})`,
     predOutcomeDef:
       "Modelvoorspelling voor elke vergelijkbare patiënt op de geselecteerde horizon.",
@@ -127,8 +166,29 @@ const SBS_T = {
     systDef: "Chemotherapie (eerste schema), aantal cycli en timing.",
     targetLabel: "Doelgerichte therapie",
     targetDef: "Doelgerichte of immuuntherapie-middelen.",
+    outcomeBanner: (survived: number, died: number, total: number, horizon: string) =>
+      `Van ${total} vergelijkbare patiënt${total !== 1 ? "en" : ""}: ${survived} overleefde${survived !== 1 ? "n" : ""} voorbij ${horizon}, ${died} niet.`,
+    modelPredicts: (pct: string, horizon: string) =>
+      `Model voorspelt ${pct} overleving op ${horizon}.`,
+    modelPredictsQol: (score: string, horizon: string) =>
+      `Model voorspelt ${score} kwaliteit van leven op ${horizon}.`,
+    outcomesConsistent: "Uitkomsten van vergelijkbare patiënten komen overeen met de voorspelling.",
+    outcomesBetter: "Vergelijkbare patiënten deden het beter dan het model voorspelt.",
+    outcomesWorse: "Vergelijkbare patiënten deden het slechter dan het model voorspelt.",
+    outcomesMixed: "Vergelijkbare patiënten hadden gemengde uitkomsten — voorspelling is minder zeker.",
+    qolBanner: (avg: string, n: number, horizon: string) =>
+      `${n} vergelijkbare patiënt${n !== 1 ? "en" : ""} hadden gemiddeld ${avg} KvL op ${horizon}.`,
+    qolClose: "Vergelijkbare patiënten scoorden dicht bij de voorspelling van het model.",
+    qolHigher: "Vergelijkbare patiënten scoorden hoger dan het model voorspelt.",
+    qolLower: "Vergelijkbare patiënten scoorden lager dan het model voorspelt.",
+    strongMatch: "Sterk",
+    moderateMatch: "Matig",
+    weakMatch: "Zwak",
+    baselineQol: "baseline KvL",
   },
 } as const;
+
+type TDict = (typeof SBS_T)[keyof typeof SBS_T];
 
 const OUTCOME_FIELD_KEYS = new Set<string>([
   "vit_stat", "vit_stat_int", "rfs_event", "rfs_int", "pfs_event", "pfs_int",
@@ -164,6 +224,13 @@ type Props = {
   locale?: string;
 };
 
+function detectIsRsf(prediction?: Record<string, unknown>): boolean {
+  if (!prediction) return true;
+  return Object.keys(prediction).some(
+    (k) => k.startsWith("survival_prob_") || k.startsWith("mortality_risk_"),
+  );
+}
+
 export function SideBySideView({
   cases,
   queryFeatures,
@@ -176,6 +243,7 @@ export function SideBySideView({
   locale = "en",
 }: Props) {
   const t = SBS_T[locale as keyof typeof SBS_T] ?? SBS_T.en;
+  const isRsf = detectIsRsf(queryPrediction);
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const querySource = queryRawFeatures ?? queryFeatures;
 
@@ -228,16 +296,19 @@ export function SideBySideView({
       const traj = c._trajectory as Record<string, number> | undefined;
       const val = traj?.[timeHorizon];
       if (val == null) return { text: "—" } as Decoded;
-      return { text: val.toFixed(1), tone: "neutral" as Tone } as Decoded;
+      return {
+        text: isRsf ? `${val.toFixed(1)}%` : `${val.toFixed(1)} / 100`,
+        tone: "neutral" as Tone,
+      } as Decoded;
     });
     if (caseValues.every((d) => d.text === "—")) return null;
-    const horizonLabel = timeHorizon.replace(/_/g, "-").replace(/s$/, "");
+    const horizonLabel = t.horizonLabel(timeHorizon);
     return {
       label: t.predOutcome(horizonLabel),
       definition: t.predOutcomeDef,
       cases: caseValues,
     };
-  }, [timeHorizon, cases, t]);
+  }, [timeHorizon, cases, t, isRsf]);
 
   if (!cases || cases.length === 0) {
     return (
@@ -264,7 +335,8 @@ export function SideBySideView({
 
   const totalVisible = visibleGroups.reduce((n, g) => n + g.keys.length, 0);
 
-  const outcomeRows: ComposedRow[] = [    
+  const outcomeRows: ComposedRow[] = [
+    ...(trajectoryRow ? [trajectoryRow] : []),
     { label: t.survivalLabel, definition: t.survivalDef, cases: cases.map((c) => decodeSurvival(c, locale)) },
     { label: t.recurrenceLabel, definition: t.recurrenceDef, cases: cases.map((c) => decodeRecurrence(c, locale)) },
     { label: t.progressionLabel, definition: t.progressionDef, cases: cases.map((c) => decodeProgression(c, locale)) },
@@ -297,6 +369,14 @@ export function SideBySideView({
           <FilterToggle value={filterMode} onChange={setFilterMode} locale={locale} />
         </div>
 
+        <OutcomeAgreementBanner
+          cases={cases}
+          queryPrediction={queryPrediction}
+          timeHorizon={timeHorizon}
+          isRsf={isRsf}
+          t={t}
+        />
+
         <div className="overflow-x-auto rounded-lg border border-border/50 bg-card shadow-sm">
           <table className="w-full border-collapse text-sm">
             <thead className="bg-muted/40">
@@ -312,14 +392,7 @@ export function SideBySideView({
                     key={i}
                     className="text-left px-3 py-3 border-b border-border/60 border-l border-border/30 min-w-[160px]"
                   >
-                    <ColumnHeader
-                      label={`${t.caseLabel} ${i + 1}`}
-                      similarity={getSimilarity(c)}
-                      clusterSize={isPrototype ? getClusterSize(c) : null}
-                      riskScore={isPrototype ? getRiskScore(c) : null}
-                      matchCount={matchCounts[i]}
-                      totalFeatures={baselineKeys.length}
-                    />
+                    <ColumnHeader label={`${t.caseLabel} ${i + 1}`} />
                   </th>
                 ))}
               </tr>
@@ -375,6 +448,186 @@ export function SideBySideView({
   );
 }
 
+function horizonToDays(horizon: string): number | null {
+  const map: Record<string, number> = {
+    "1_month": 30,
+    "3_months": 91,
+    "6_months": 182,
+    "9_months": 274,
+    "12_months": 365,
+  };
+  return map[horizon] ?? null;
+}
+
+function OutcomeAgreementBanner({
+  cases,
+  queryPrediction,
+  timeHorizon,
+  isRsf,
+  t,
+}: {
+  cases: CaseRecord[];
+  queryPrediction?: Record<string, unknown>;
+  timeHorizon?: string;
+  isRsf: boolean;
+  t: TDict;
+}) {
+  const p = queryPrediction;
+  if (!p || cases.length === 0) return null;
+
+  if (!isRsf) {
+    const horizon = timeHorizon ?? "12_months";
+    const hLabel = t.horizonLabel(horizon);
+    const qolPred = p[`qol_${horizon}`];
+    if (typeof qolPred !== "number") return null;
+
+    const trajValues: number[] = [];
+    for (const c of cases) {
+      const traj = c._trajectory as Record<string, number> | undefined;
+      const val = traj?.[horizon];
+      if (typeof val === "number") trajValues.push(val);
+    }
+    if (trajValues.length === 0) return null;
+
+    const avg = trajValues.reduce((s, v) => s + v, 0) / trajValues.length;
+    const diff = avg - qolPred;
+    let signal: { text: string; tone: "good" | "warn" | "bad" };
+    if (Math.abs(diff) < 10) {
+      signal = { text: t.qolClose, tone: "good" };
+    } else if (diff > 0) {
+      signal = { text: t.qolHigher, tone: "warn" };
+    } else {
+      signal = { text: t.qolLower, tone: "bad" };
+    }
+
+    const predictionLine = t.modelPredictsQol(`${qolPred.toFixed(1)} / 100`, hLabel);
+
+    const toneBorder =
+      signal.tone === "good"
+        ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-800/40 dark:bg-emerald-950/20"
+        : signal.tone === "warn"
+          ? "border-amber-200 bg-amber-50/40 dark:border-amber-800/40 dark:bg-amber-950/20"
+          : "border-rose-200 bg-rose-50/40 dark:border-rose-800/40 dark:bg-rose-950/20";
+
+    return (
+      <div className={`rounded-lg border px-4 py-3 space-y-1 ${toneBorder}`}>
+        <p className="text-xs text-foreground leading-relaxed">
+          <span className="font-medium">
+            {t.qolBanner(`${avg.toFixed(1)} / 100`, trajValues.length, hLabel)}
+          </span>
+          {" "}{predictionLine}
+        </p>
+        <p
+          className={`text-[11px] font-medium ${
+            signal.tone === "good"
+              ? "text-emerald-700 dark:text-emerald-400"
+              : signal.tone === "warn"
+                ? "text-amber-700 dark:text-amber-400"
+                : "text-rose-700 dark:text-rose-400"
+          }`}
+        >
+          {signal.text}
+        </p>
+      </div>
+    );
+  }
+
+  const horizon = timeHorizon ?? "12_months";
+  const horizonDays = horizonToDays(horizon);
+  if (!horizonDays) return null;
+
+  const hLabel = t.horizonLabel(horizon);
+
+  let survivedPast = 0;
+  let diedBefore = 0;
+  let usable = 0;
+
+  for (const c of cases) {
+    const days = c.vit_stat_int;
+    const status = c.vit_stat;
+    if (typeof days !== "number" || status == null) continue;
+    usable++;
+    if (status === 0 || days > horizonDays) {
+      survivedPast++;
+    } else {
+      diedBefore++;
+    }
+  }
+
+  if (usable === 0) return null;
+
+  const caseRate = survivedPast / usable;
+
+  let modelSurvival: number | null = null;
+  let predictionLine: string | null = null;
+  const survProb = p[`survival_prob_${horizon}`];
+  const mortRisk = p[`mortality_risk_${horizon}`];
+  if (typeof survProb === "number") {
+    modelSurvival = survProb;
+    predictionLine = t.modelPredicts(
+      `${(survProb * 100).toFixed(0)}%`,
+      hLabel,
+    );
+  } else if (typeof mortRisk === "number") {
+    modelSurvival = 1 - mortRisk;
+    predictionLine = t.modelPredicts(
+      `${((1 - mortRisk) * 100).toFixed(0)}%`,
+      hLabel,
+    );
+  }
+
+  let agreementSignal: {
+    text: string;
+    tone: "good" | "warn" | "bad";
+  } | null = null;
+
+  if (modelSurvival !== null && usable >= 2) {
+    const diff = caseRate - modelSurvival;
+    if (Math.abs(diff) < 0.3) {
+      agreementSignal = { text: t.outcomesConsistent, tone: "good" };
+    } else if (caseRate > 0.2 && caseRate < 0.8) {
+      agreementSignal = { text: t.outcomesMixed, tone: "warn" };
+    } else if (diff > 0) {
+      agreementSignal = { text: t.outcomesBetter, tone: "warn" };
+    } else {
+      agreementSignal = { text: t.outcomesWorse, tone: "bad" };
+    }
+  }
+
+  const toneBorder =
+    agreementSignal?.tone === "good"
+      ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-800/40 dark:bg-emerald-950/20"
+      : agreementSignal?.tone === "warn"
+        ? "border-amber-200 bg-amber-50/40 dark:border-amber-800/40 dark:bg-amber-950/20"
+        : agreementSignal?.tone === "bad"
+          ? "border-rose-200 bg-rose-50/40 dark:border-rose-800/40 dark:bg-rose-950/20"
+          : "border-border/50 bg-muted/20";
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 space-y-1 ${toneBorder}`}>
+      <p className="text-xs text-foreground leading-relaxed">
+        <span className="font-medium">
+          {t.outcomeBanner(survivedPast, diedBefore, usable, hLabel)}
+        </span>
+        {predictionLine && <span className="ml-1">{predictionLine}</span>}
+      </p>
+      {agreementSignal && (
+        <p
+          className={`text-[11px] font-medium ${
+            agreementSignal.tone === "good"
+              ? "text-emerald-700 dark:text-emerald-400"
+              : agreementSignal.tone === "warn"
+                ? "text-amber-700 dark:text-amber-400"
+                : "text-rose-700 dark:text-rose-400"
+          }`}
+        >
+          {agreementSignal.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function FilterToggle({
   value,
   onChange,
@@ -418,10 +671,6 @@ function FilterToggle({
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Composed section (outcome / treatment)                             */
-/* ------------------------------------------------------------------ */
 
 type ComposedRow = {
   label: string;
@@ -523,8 +772,6 @@ function toneCellClass(tone?: Tone): string {
       return "";
   }
 }
-
-type TDict = (typeof SBS_T)[keyof typeof SBS_T];
 
 function GroupedBaselineSection({
   colSpan,
@@ -635,7 +882,6 @@ function GroupRows({
         const qv = querySource[key];
         const friendly = glossary?.[key]?.label ?? key;
         const definition = glossary?.[key]?.definition;
-        const isDiffering = differingKeys.has(key);
         const isEven = globalIdx % 2 === 0;
         const rowBgClass = isEven ? "bg-background" : "bg-muted/10";
         return (
@@ -683,52 +929,20 @@ function GroupRows({
 function ColumnHeader({
   label,
   accent,
-  similarity,
-  clusterSize,
-  riskScore,
-  matchCount,
-  totalFeatures,
 }: {
   label: string;
   accent?: boolean;
-  similarity?: number | null;
-  clusterSize?: number | null;
-  riskScore?: number | null;
-  matchCount?: number;
-  totalFeatures?: number;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span
-        className={`text-xs font-semibold ${
-          accent
-            ? "text-emerald-700 dark:text-emerald-400"
-            : "text-foreground"
-        }`}
-      >
-        {label}
-      </span>
-      <div className="flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-normal">
-        {typeof similarity === "number" && (
-          <span className="text-muted-foreground">
-            sim {(similarity * 100).toFixed(0)}%
-          </span>
-        )}
-        {typeof matchCount === "number" && typeof totalFeatures === "number" && (
-          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-            {matchCount}/{totalFeatures} match
-          </span>
-        )}
-        {typeof clusterSize === "number" && (
-          <span className="text-muted-foreground">n = {clusterSize}</span>
-        )}
-        {typeof riskScore === "number" && (
-          <span className="text-muted-foreground">
-            risk {riskScore.toFixed(2)}
-          </span>
-        )}
-      </div>
-    </div>
+    <span
+      className={`text-xs font-semibold ${
+        accent
+          ? "text-emerald-700 dark:text-emerald-400"
+          : "text-foreground"
+      }`}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -739,14 +953,4 @@ function valuesEqual(a: unknown, b: unknown): boolean {
     return Math.abs(a - b) < 1e-9;
   }
   return String(a) === String(b);
-}
-
-function formatValue(v: unknown): string {
-  if (v == null) return "—";
-  if (typeof v === "number") {
-    if (Number.isInteger(v)) return String(v);
-    return v.toFixed(2);
-  }
-  if (typeof v === "boolean") return v ? "yes" : "no";
-  return String(v);
 }

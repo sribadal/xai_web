@@ -58,24 +58,24 @@ const SHELL_T = {
 
 const MODALITY_INTRO: Record<string, { en: string; nl: string }> = {
   ATTRIBUTION_rsf: {
-    en: "This explanation highlights which patient characteristics had the most influence on the survival prediction. Green bars (left) indicate features that lower mortality risk; red bars (right) indicate features that increase it. Longer bars have a stronger effect.",
-    nl: "Deze uitleg laat zien welke patiëntkenmerken de meeste invloed hadden op de overlevingsvoorspelling. Groene balken (links) duiden op kenmerken die het sterfterisico verlagen; rode balken (rechts) op kenmerken die het verhogen. Langere balken hebben een sterker effect.",
+    en: "Below you see which patient characteristics pushed the survival estimate up or down. Green bars point to features associated with better survival; red bars point to features associated with higher mortality risk. The longer the bar, the stronger the influence. Focus on the top features to understand what drives this particular estimate.",
+    nl: "Hieronder ziet u welke patiëntkenmerken de overlevingsschatting omhoog of omlaag hebben geduwd. Groene balken wijzen op kenmerken die samenhangen met betere overleving; rode balken op kenmerken die samenhangen met hoger sterfterisico. Hoe langer de balk, hoe sterker de invloed. Kijk vooral naar de bovenste kenmerken om te begrijpen waar deze schatting op gebaseerd is.",
   },
   ATTRIBUTION_condor: {
-    en: "This explanation highlights which patient characteristics had the most influence on the quality-of-life prediction. Green bars (right) indicate features that improve predicted quality of life; red bars (left) indicate features that reduce it. Longer bars have a stronger effect.",
-    nl: "Deze uitleg laat zien welke patiëntkenmerken de meeste invloed hadden op de kwaliteit-van-levenvoorspelling. Groene balken (rechts) duiden op kenmerken die de voorspelde kwaliteit van leven verbeteren; rode balken (links) op kenmerken die deze verminderen. Langere balken hebben een sterker effect.",
+    en: "Below you see which patient characteristics pushed the quality-of-life estimate up or down. Green bars point to features associated with better quality of life; red bars point to features associated with worse quality of life. The longer the bar, the stronger the influence. Focus on the top features to understand what drives this particular estimate.",
+    nl: "Hieronder ziet u welke patiëntkenmerken de kwaliteit-van-levenschatting omhoog of omlaag hebben geduwd. Groene balken wijzen op kenmerken die samenhangen met betere kwaliteit van leven; rode balken op kenmerken die samenhangen met slechtere kwaliteit van leven. Hoe langer de balk, hoe sterker de invloed. Kijk vooral naar de bovenste kenmerken om te begrijpen waar deze schatting op gebaseerd is.",
   },
   COUNTERFACTUAL: {
-    en: "This explanation shows what would need to be different about this patient for the predicted outcome to change. It highlights the smallest changes in patient characteristics that would lead to a different prediction.",
-    nl: "Deze uitleg laat zien wat er anders zou moeten zijn aan deze patiënt om de voorspelde uitkomst te veranderen. Het toont de kleinste veranderingen in patiëntkenmerken die tot een andere voorspelling zouden leiden.",
+    en: "Below you see what would need to be different about this patient for the outcome estimate to change. The table compares the patient as they are now (left) with a hypothetical alternative profile (right). Changed values are highlighted. This can help you judge how sensitive the estimate is to specific characteristics.",
+    nl: "Hieronder ziet u wat er anders zou moeten zijn aan deze patiënt om de uitkomstschatting te veranderen. De tabel vergelijkt de patiënt zoals die nu is (links) met een hypothetisch alternatief profiel (rechts). Gewijzigde waarden zijn gemarkeerd. Dit kan u helpen inschatten hoe gevoelig de schatting is voor specifieke kenmerken.",
   },
   CASE_BASED: {
-    en: "This explanation shows patients from the dataset who are most similar to the current patient. You can compare their characteristics and outcomes side by side to better understand the prediction.",
-    nl: "Deze uitleg toont patiënten uit de dataset die het meest lijken op de huidige patiënt. U kunt hun kenmerken en uitkomsten naast elkaar vergelijken om de voorspelling beter te begrijpen.",
+    en: "Below you see real patients from the dataset whose clinical profiles most closely resemble this patient. You can compare their characteristics, treatments, and observed outcomes side by side. This gives context for the estimate by showing what actually happened to similar patients.",
+    nl: "Hieronder ziet u echte patiënten uit de dataset wier klinische profielen het meest lijken op deze patiënt. U kunt hun kenmerken, behandelingen en waargenomen uitkomsten naast elkaar vergelijken. Dit geeft context bij de schatting door te laten zien wat er daadwerkelijk gebeurde met vergelijkbare patiënten.",
   },
   RULE_BASED: {
-    en: "This explanation presents simple if-then rules that describe how the model reached its prediction. Each rule shows a combination of patient conditions and the outcome they point to.",
-    nl: "Deze uitleg presenteert eenvoudige als-dan-regels die beschrijven hoe het model tot zijn voorspelling is gekomen. Elke regel toont een combinatie van patiëntcondities en de uitkomst waar ze naar wijzen.",
+    en: "Below you see a set of simple if-then rules that describe how the estimate was reached for this patient. Each rule lists clinical conditions and the outcome they point to. This gives a step-by-step view of the reasoning, similar to a clinical decision tree.",
+    nl: "Hieronder ziet u een set eenvoudige als-dan-regels die beschrijven hoe de schatting voor deze patiënt tot stand is gekomen. Elke regel noemt klinische condities en de uitkomst waar ze naar wijzen. Dit geeft een stapsgewijs overzicht van de redenering, vergelijkbaar met een klinische beslisboom.",
   },
 };
 
