@@ -65,6 +65,9 @@ export function buildEntries({
   if (cfRow) for (const k of Object.keys(cfRow)) keys.add(k);
   for (const k of Object.keys(content)) keys.add(k);
 
+  const declaredChanges = new Set(Object.keys(content));
+  const contentIsAuthoritative = declaredChanges.size > 0;
+
   const pairs: EntryPair[] = [];
   const changed: ChangedFeature[] = [];
 
@@ -92,6 +95,7 @@ export function buildEntries({
       displayValue: resolveDisplay(rawKey, originalRaw, valueLabels, locale),
       rawValue: originalRaw,
     };
+
     const counterfactual: CardEntry = {
       rawKey,
       feature,
@@ -104,7 +108,12 @@ export function buildEntries({
 
     pairs.push({ original, counterfactual });
 
-    if (!valuesEqual(originalRaw, cfEffective)) {
+    const differs = !valuesEqual(originalRaw, cfEffective);
+    const isChanged = contentIsAuthoritative
+      ? declaredChanges.has(rawKey) && differs
+      : differs;
+
+    if (isChanged) {
       const { implausible, reason } = detectImplausibility(
         feature,
         originalRaw,
@@ -132,5 +141,6 @@ export function buildEntries({
       });
     }
   }
+
   return { pairs, changed };
 }

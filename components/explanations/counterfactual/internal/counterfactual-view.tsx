@@ -183,11 +183,8 @@ export function CounterfactualView({
   }, [changed]);
 
   const changedPairs = useMemo(
-    () =>
-      pairs.filter(
-        (p) => !valuesEqual(p.original.rawValue, p.counterfactual.rawValue),
-      ),
-    [pairs],
+    () => pairs.filter((p) => changedMap.has(p.original.rawKey)),
+    [pairs, changedMap],
   );
 
   const visiblePairs = viewTab === "changed" ? changedPairs : pairs;
@@ -257,8 +254,8 @@ export function CounterfactualView({
                 visiblePairs.map((pair, rowIdx) => {
                   const orig = pair.original;
                   const cf = pair.counterfactual;
-                  const isChanged = !valuesEqual(orig.rawValue, cf.rawValue);
                   const changedFeature = changedMap.get(orig.rawKey);
+                  const isChanged = !!changedFeature;
                   const implausible = !!changedFeature?.implausible;
                   const implausibleReason = changedFeature?.implausibleReason;
                   const isEven = rowIdx % 2 === 0;

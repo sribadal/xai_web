@@ -35,6 +35,8 @@ const PLAUSIBLE_RANGES: Record<string, [number, number]> = {
   trombocyten: [0, 1200],
 }
 
+const REGISTRY_SENTINELS = new Set([999.9, 9000, 9999, 9999.9])
+
 const NORMALISED_FEATURES = new Set([
   "ts_surg",
   "ts_syst",
@@ -43,6 +45,10 @@ const NORMALISED_FEATURES = new Set([
   "time since surgery",
   "time since systemic therapy",
 ])
+
+function isRegistrySentinel(value: number | string | null): boolean {
+  return typeof value === "number" && REGISTRY_SENTINELS.has(value)
+}
 
 export function lookupPlausibleRange(feature: string): [number, number] | null {
   const key = feature.toLowerCase().replace(/[^a-z0-9]/g, "")
@@ -62,6 +68,7 @@ export function detectImplausibility(
   const t = PLAUS_T[locale as keyof typeof PLAUS_T] ?? PLAUS_T.en;
 
   if (typeof cfRaw !== "number") return { implausible: false }
+  if (isRegistrySentinel(cfRaw)) return { implausible: false }
 
   if (NORMALISED_FEATURES.has(feature)) {
     if (cfRaw < -0.05 || cfRaw > 1.05) {
@@ -78,7 +85,12 @@ export function detectImplausibility(
     }
   }
 
-  if (typeof originalRaw === "number" && originalRaw !== 0 && cfRaw !== 0) {
+  if (
+    typeof originalRaw === "number" &&
+    !isRegistrySentinel(originalRaw) &&
+    originalRaw !== 0 &&
+    cfRaw !== 0
+  ) {
     const ratio =
       Math.abs(cfRaw) > Math.abs(originalRaw)
         ? Math.abs(cfRaw / originalRaw)
