@@ -62,7 +62,7 @@ export function ContributionChart({
 }: Props) {
   const size = useChartSize();
   const isLarge = size === "large";
-  const barsPerRow = plottedHorizons.length;
+  const barsPerRow = isOverlay ? Math.max(1, plottedHorizons.length) : 1;
   const chartHeight = computeChartHeight(rows.length, barsPerRow, isLarge);
   const barMaxSize = isLarge
     ? barsPerRow === 1
