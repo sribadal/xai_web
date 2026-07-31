@@ -35,7 +35,7 @@ const PLAUSIBLE_RANGES: Record<string, [number, number]> = {
   trombocyten: [0, 1200],
 }
 
-const REGISTRY_SENTINELS = new Set([999.9, 9000, 9999, 9999.9])
+const REGISTRY_SENTINELS = new Set([99.9, 999, 999.9, 9999, 9999.9])
 
 const NORMALISED_FEATURES = new Set([
   "ts_surg",

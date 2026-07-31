@@ -117,8 +117,9 @@ const VALUE_MAPS: Record<string, Record<string, string>> = {
     "33": "Never", "44": "Not currently", "77": "Not in records", "99": "Unknown",
   },
   diag_basis: {
-    "1": "Clinical", "2": "Clinical examination", "4": "Tumour markers",
-    "5": "Cytology", "6": "Histology (metastasis)", "7": "Histology",
+    "0": "Death certificate only", "1": "Clinical examination only",
+    "2": "Clinical investigation", "4": "Tumour markers",
+    "5": "Cytology", "6": "Histology (metastasis)", "7": "Histology (primary)",
   },
   topo_sublok: {
     C250: "Pancreas head", C251: "Pancreas body", C252: "Pancreas tail",
@@ -139,38 +140,39 @@ const VALUE_MAPS: Record<string, Record<string, string>> = {
     "8003": "Malignant tumour, giant cell", "8010": "Carcinoma NOS",
     "8012": "Large cell carcinoma", "8020": "Undifferentiated carcinoma",
     "8021": "Anaplastic carcinoma", "8022": "Pleomorphic carcinoma",
-    "8031": "Giant cell carcinoma",
+    "8031": "Giant cell carcinoma", "8033": "Pseudosarcomatous carcinoma",
+    "8034": "Polygonal cell carcinoma",
     "8035": "Carcinoma with osteoclast-like giant cells",
     "8046": "Non-small cell carcinoma", "8070": "Squamous cell carcinoma",
+    "8072": "Non-keratinising squamous cell carcinoma",
+    "8083": "Basaloid squamous cell carcinoma",
     "8140": "Adenocarcinoma NOS", "8141": "Scirrhous adenocarcinoma",
     "8144": "Adenocarcinoma, intestinal type",
+    "8145": "Adenocarcinoma, diffuse type",
     "8163": "Pancreatobiliary carcinoma", "8211": "Tubular adenocarcinoma",
     "8310": "Clear cell adenocarcinoma", "8440": "Cystadenocarcinoma",
     "8480": "Mucinous adenocarcinoma", "8481": "Mucin-producing adenocarcinoma",
     "8490": "Signet ring cell carcinoma", "8500": "Ductal carcinoma NOS",
     "8510": "Medullary carcinoma", "8560": "Adenosquamous carcinoma",
-    "8576": "Hepatoid adenocarcinoma",
+    "8570": "Adenocarcinoma with squamous metaplasia",
+    "8575": "Metaplastic carcinoma NOS", "8576": "Hepatoid adenocarcinoma",
   },
   ct: {
-    "0": "cT0 (no primary tumour)", "1": "cT1 (≤ 2 cm, pancreas only)",
-    "2": "cT2 (> 2 cm, pancreas only)", "3": "cT3 (beyond pancreas)",
-    "4": "cT4 (involves celiac axis/SMA)", X: "cTX (unknown)", is: "cTis (in situ)",
+    "0": "cT0", "1": "cT1", "2": "cT2", "3": "cT3", "4": "cT4",
+    X: "cTX (unknown)", is: "cTis (in situ)",
   },
   cn: {
-    "0": "cN0 (no nodal spread)", "1": "cN1 (1–3 positive nodes)",
-    "2": "cN2 (≥ 4 positive nodes)", X: "cNX (unknown)",
+    "0": "cN0", "1": "cN1", "2": "cN2", X: "cNX (unknown)",
   },
   cm: {
     "0": "cM0 (no distant spread)", "1": "cM1 (distant metastasis)", X: "cMX (unknown)",
   },
   pt: {
-    "0": "pT0 (no primary tumour)", "1": "pT1 (≤ 2 cm, pancreas only)",
-    "2": "pT2 (> 2 cm, pancreas only)", "3": "pT3 (beyond pancreas)",
-    "4": "pT4 (involves celiac axis/SMA)", X: "pTX (unknown)", is: "pTis (in situ)",
+    "0": "pT0", "1": "pT1", "2": "pT2", "3": "pT3", "4": "pT4",
+    X: "pTX (unknown)", is: "pTis (in situ)",
   },
   pn: {
-    "0": "pN0 (no nodal spread)", "1": "pN1 (1–3 positive nodes)",
-    "2": "pN2 (≥ 4 positive nodes)", X: "pNX (unknown)",
+    "0": "pN0", "1": "pN1", "2": "pN2", X: "pNX (unknown)",
   },
   pm: {
     "0": "pM0 (no distant spread)", "1": "pM1 (distant metastasis)", X: "pMX (unknown)",
@@ -215,7 +217,7 @@ const VALUE_MAPS: Record<string, Record<string, string>> = {
   ond_lymf: { "0": "None examined", "98": "Unknown count", "99": "Unknown if examined" },
   pos_lymf: { "0": "None positive", "98": "Unknown count", "99": "Unknown if positive" },
   meta_lok_aantal: {
-    "1": "1 site", "2": "2 sites", "3": "3 sites", "4": "4 sites",
+    "0": "None", "1": "1 site", "2": "2 sites", "3": "3 sites", "4": "4 sites",
     "5": "5 sites", "6": "6 sites", "7": "7 sites", "77": "> 3 sites",
   },
   therprepost: {
@@ -342,12 +344,13 @@ const NL_OVERRIDES: Record<string, string> = {
   "Pre & post-surgical": "Pre- en postchirurgisch",
   "Yes (no surgery)": "Ja (geen chirurgie)",
   // Diagnosis
-  "Clinical": "Klinisch",
-  "Clinical examination": "Klinisch onderzoek",
+  "Death certificate only": "Alleen overlijdensverklaring",
+  "Clinical examination only": "Alleen klinisch onderzoek",
+  "Clinical investigation": "Klinisch-diagnostisch onderzoek",
   "Tumour markers": "Tumormarkers",
   "Cytology": "Cytologie",
   "Histology (metastasis)": "Histologie (metastase)",
-  "Histology": "Histologie",
+  "Histology (primary)": "Histologie (primaire tumor)",
   // Seasons
   "Winter (Dec–Feb)": "Winter (dec–feb)",
   "Spring (Mar–May)": "Lente (mrt–mei)",
@@ -487,9 +490,7 @@ function decodeEN(key: string, value: unknown): string {
 
   // 5b. TNM fallback
   const tnmPrefix = TNM_PREFIXES[key] ?? TNM_PREFIXES[base];
-  if (tnmPrefix) {
-    return `${tnmPrefix}${normalizedVal}`;
-  }
+  if (tnmPrefix) return "—";
 
   // 6. syst_kuren: normal integers
   if (base === "syst_kuren" && typeof value === "number" && value >= 1 && value <= 50) {
