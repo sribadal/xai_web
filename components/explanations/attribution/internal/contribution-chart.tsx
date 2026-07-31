@@ -207,22 +207,13 @@ function GlossaryYTick({
   glossary?: Record<string, GlossaryEntry>
 }) {
   const raw = payload?.value ?? ""
-
-  // Split "impulse_surg (≤ 0)" into feature="impulse_surg" + suffix="(≤ 0)"
   const parenIdx = raw.indexOf(" (")
   const feature = parenIdx > -1 ? raw.slice(0, parenIdx) : raw
-  const suffix = parenIdx > -1 ? raw.slice(parenIdx) : ""
 
-  const friendlyName =
+  const label =
     glossary?.[feature]?.label ??
     CONDOR_LABELS[feature] ??
     feature
-
-  // Only append suffix if the friendly name doesn't already have parens
-  const label =
-    suffix && !friendlyName.includes("(")
-      ? `${friendlyName} ${suffix.trim()}`
-      : friendlyName
 
   return (
     <text
