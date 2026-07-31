@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import type { Modality } from "@/lib/generated/prisma/client";
 import { ThinkAloudHint } from "./ThinkAloudHint";
 import { AttributionView } from "@/components/explanations/attribution";
@@ -31,6 +31,10 @@ const SHELL_T = {
     noData: "No data found.",
     noDataHorizon: (label: string) => `No data found at ${label}.`,
     errorPrefix: "Could not generate this explanation:",
+    sharedComparator: (horizons: string) =>
+      `The same comparable patient was also the closest match at ${horizons}, so this comparison is identical there. Only the predicted difference changes.`,
+    monthsUnit: (n: number) => (n === 1 ? "month" : "months"),
+    listAnd: "and",
     thinkAloud:
       "Please keep talking as you review this screen: what you notice first, what you understand, and what feels unclear.",
   },
@@ -51,6 +55,10 @@ const SHELL_T = {
     noData: "Geen gegevens gevonden.",
     noDataHorizon: (label: string) => `Geen gegevens gevonden bij ${label}.`,
     errorPrefix: "Kon deze uitleg niet genereren:",
+    sharedComparator: (horizons: string) =>
+      `Dezelfde vergelijkbare patiënt was ook bij ${horizons} de beste match, dus deze vergelijking is daar identiek. Alleen het voorspelde verschil verandert.`,
+    monthsUnit: (n: number) => (n === 1 ? "maand" : "maanden"),
+    listAnd: "en",
     thinkAloud:
       "Blijf alstublieft hardop denken terwijl u dit scherm bekijkt: wat u als eerste opvalt, wat u begrijpt en wat onduidelijk is.",
   },
@@ -79,13 +87,16 @@ const MODALITY_INTRO: Record<string, { en: string; nl: string }> = {
   },
 };
 
-const RSF_HORIZON_OPTIONS: { value: string; label: { en: string; nl: string } }[] = [
+type HorizonOption = { value: string; label: { en: string; nl: string } };
+type ShellCopy = (typeof SHELL_T)["en"] | (typeof SHELL_T)["nl"];
+
+const RSF_HORIZON_OPTIONS: HorizonOption[] = [
   { value: "3_months", label: { en: "3-month risk", nl: "3-maanden risico" } },
   { value: "6_months", label: { en: "6-month risk", nl: "6-maanden risico" } },
   { value: "12_months", label: { en: "12-month risk", nl: "12-maanden risico" } },
 ];
 
-const CONDOR_HORIZON_OPTIONS: { value: string; label: { en: string; nl: string } }[] = [
+const CONDOR_HORIZON_OPTIONS: HorizonOption[] = [
   { value: "1_month", label: { en: "1-month QoL", nl: "1-maand KvL" } },
   { value: "3_months", label: { en: "3-month QoL", nl: "3-maanden KvL" } },
   { value: "6_months", label: { en: "6-month QoL", nl: "6-maanden KvL" } },
@@ -126,6 +137,75 @@ function firstPredictionHorizon(
     }
   }
   return undefined;
+}
+
+function comparatorSignature(metadata: unknown): string | null {
+  const cf = (metadata as { raw_cf?: unknown } | null)?.raw_cf;
+  if (!cf || typeof cf !== "object") return null;
+
+  const entries = Object.entries(cf as Record<string, unknown>)
+    .filter(([, v]) => typeof v === "number" && Number.isFinite(v))
+    .map(([k, v]) => [k, Math.round((v as number) * 1e4) / 1e4] as const)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+
+  if (entries.length === 0) return null;
+  return JSON.stringify(entries);
+}
+
+function formatHorizonList(
+  horizons: string[],
+  options: HorizonOption[],
+  locale: "en" | "nl",
+  t: ShellCopy,
+): string {
+  const nums = horizons.map((h) => {
+    const m = /^(\d+)_month/.exec(h);
+    return m ? Number(m[1]) : NaN;
+  });
+  const numeric = nums.every((n) => Number.isFinite(n));
+
+  const parts = numeric
+    ? nums.map(String)
+    : horizons.map(
+        (h) => options.find((o) => o.value === h)?.label[locale] ?? h,
+      );
+
+  const joined =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(", ")} ${t.listAnd} ${parts[parts.length - 1]}`;
+
+  return numeric ? `${joined} ${t.monthsUnit(nums[nums.length - 1])}` : joined;
+}
+
+function SharedComparatorNotice({
+  others,
+  options,
+  locale,
+  t,
+}: {
+  others: string[];
+  options: HorizonOption[];
+  locale: "en" | "nl";
+  t: ShellCopy;
+}) {
+  if (others.length === 0) return null;
+  return (
+    <p
+      className="survey-prose"
+      style={{
+        margin: 0,
+        fontSize: "0.85rem",
+        lineHeight: 1.5,
+        maxWidth: "56ch",
+        color: "var(--survey-ink-soft, #555)",
+        borderLeft: "2px solid var(--survey-border, #d4d4d4)",
+        paddingLeft: "var(--survey-space-3)",
+      }}
+    >
+      {t.sharedComparator(formatHorizonList(others, options, locale, t))}
+    </p>
+  );
 }
 
 export function VignetteShell({
@@ -249,6 +329,44 @@ export function VignetteShell({
     }
     return map;
   }, [modality, explanations, horizonOptions]);
+
+  const cfGroupsByMethod = useMemo(() => {
+    const map = new Map<string, Map<string, string[]>>();
+    if (modality !== "COUNTERFACTUAL") return map;
+
+    for (const exp of explanations) {
+      if (exp.error) continue;
+      const horizon = exp.timeHorizon ?? "";
+      if (!horizon) continue;
+      const sig = comparatorSignature(exp.metadata);
+      if (!sig) continue;
+
+      if (!map.has(exp.method)) map.set(exp.method, new Map());
+      const bySig = map.get(exp.method)!;
+      bySig.set(sig, [...(bySig.get(sig) ?? []), horizon]);
+    }
+    return map;
+  }, [modality, explanations]);
+
+  const sharedHorizonsByMethod = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (!timeHorizon) return map;
+    const order = horizonOptions.map((o) => o.value);
+
+    for (const [method, bySig] of cfGroupsByMethod) {
+      for (const horizons of bySig.values()) {
+        if (!horizons.includes(timeHorizon) || horizons.length < 2) continue;
+        map.set(
+          method,
+          horizons
+            .filter((h) => h !== timeHorizon)
+            .sort((a, b) => order.indexOf(a) - order.indexOf(b)),
+        );
+        break;
+      }
+    }
+    return map;
+  }, [cfGroupsByMethod, timeHorizon, horizonOptions]);
 
   return (
     <div className="survey-stage-wide">
@@ -425,23 +543,31 @@ export function VignetteShell({
                   : exp.content;
 
               return (
-                <ExpandableCard
-                  key={`${method}-${useHorizons ? timeHorizon : "default"}`}
-                  label={methodLabel}
-                >
-                  <MethodExplanation
-                    modality={modality}
-                    method={method}
-                    content={renderedContent}
-                    metadata={exp.metadata}
-                    patient={patient}
-                    modelType={modelType}
-                    timeHorizon={useHorizons ? timeHorizon : ""}
-                    glossary={glossary}
+                <Fragment key={method}>
+                  <SharedComparatorNotice
+                    others={sharedHorizonsByMethod.get(method) ?? []}
+                    options={horizonChips}
                     locale={locale}
-                    horizonContents={horizonContentsByMethod.get(method)}
+                    t={t}
                   />
-                </ExpandableCard>
+                  <ExpandableCard
+                    key={`${method}-${useHorizons ? timeHorizon : "default"}`}
+                    label={methodLabel}
+                  >
+                    <MethodExplanation
+                      modality={modality}
+                      method={method}
+                      content={renderedContent}
+                      metadata={exp.metadata}
+                      patient={patient}
+                      modelType={modelType}
+                      timeHorizon={useHorizons ? timeHorizon : ""}
+                      glossary={glossary}
+                      locale={locale}
+                      horizonContents={horizonContentsByMethod.get(method)}
+                    />
+                  </ExpandableCard>
+                </Fragment>
               );
             })
           )}
