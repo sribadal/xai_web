@@ -156,3 +156,6 @@ The web app imports these JSON files and presents the explanation data alongside
 This project is the frontend companion to the XAI Decision Making framework:
 
 - [xai_py](https://github.com/sribadal/xai_py) contains the Python explainability framework, model adapters, all 20+ explanation methods, sanity checks, and the JSON export pipeline.
+
+## Versions
+`interface-v1` is the survey app as used for P1–P9; `interface-v2` is the version used for P10–P11. The changes are listed in [CHANGELOG_v1_v2.md](https://github.com/sribadal/xai_py/blob/main/CHANGELOG_v1_v2.md) in `xai_py`.
